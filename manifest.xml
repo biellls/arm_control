@@ -1,0 +1,15 @@
+<package>
+  <description brief="arm_control">
+
+     arm_control
+
+  </description>
+  <author>Stephan Wirth</author>
+  <license>BSD</license>
+  <review status="unreviewed" notes=""/>
+  <url>http://ros.org/wiki/arm_control</url>
+  <depend package="roscpp"/>
+
+</package>
+
+
