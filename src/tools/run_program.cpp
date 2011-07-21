@@ -1,4 +1,4 @@
-
+#include <fstream>
 #include <iostream>
 
 #include "melfa.h"
@@ -19,14 +19,10 @@ int main(int argc, char* argv[])
     params.device = std::string(argv[1]);
 
     arm_control::Melfa melfa(params);
-    if (melfa.connect())
+
+    if (!melfa.runProgram(program_file_name))
     {
-        melfa.runProgram(program_file_name);
-    }
-    else
-    {
-        std::cerr << "Connection attempt failed!" << std::endl;
-        return -2;
+        std::cerr << "error running program" << std::endl;
     }
 
     return 0;

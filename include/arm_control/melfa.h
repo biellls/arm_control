@@ -24,7 +24,15 @@ class Melfa
             std::string device;
         };
 
+        /**
+        * Create a new Melfa instance with given parameters
+        */
         Melfa(const ConfigParams& params);
+
+        /**
+        * Destructor disconnects
+        */
+        ~Melfa();
 
         /**
         * \brief connects to the robot
@@ -38,14 +46,20 @@ class Melfa
         void disconnect();
 
         /**
-        * \brief runs a MELFA BASIC IV program given by file_name
+        * \brief executes the given MELFA BASIC IV command
         */
-        void runProgram(const std::string& file_name);
+        bool execute(const std::string& command);
 
         /**
-        * \brief tells the robot to execute a MELFA BASIC IV command
+        * \brief runs a MELFA BASIC IV program given by file_name
         */
-        void execute(const std::string& command);
+        bool runProgram(const std::string& file_name);
+
+        /**
+        * \brief sends the give command directly to the robot on given slot
+        * Carriage return at end of command is added inside this method.
+        */
+        bool sendRawCommand(const std::string& command, int slot);
 
     private:
 

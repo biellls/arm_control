@@ -25,8 +25,10 @@ include_directories(${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME})
 
 rosbuild_add_library(${PROJECT_NAME} src/serialcomm.cpp src/melfa.cpp)
 rosbuild_add_executable(execute src/tools/execute.cpp)
+rosbuild_add_executable(batch_execute src/tools/batch_execute.cpp)
 rosbuild_add_executable(run_program src/tools/run_program.cpp)
 target_link_libraries(execute ${PROJECT_NAME})
+target_link_libraries(batch_execute ${PROJECT_NAME})
 target_link_libraries(run_program ${PROJECT_NAME})
 
 #common commands for building c++ executables and libraries
