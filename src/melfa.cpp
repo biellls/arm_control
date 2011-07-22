@@ -78,6 +78,7 @@ bool ac::Melfa::runProgram(const std::string& command)
 {
     if (!connected_)
         return false;
+    ROS_ERROR("Melfa::runProgram(): not implemented!");
     return false;
 }
 
