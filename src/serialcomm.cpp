@@ -130,7 +130,7 @@ bool SerialComm::readData
     else
     {
         numBytesRead = readResult;
-        success = (numBytesToRead == numBytesRead);
+        success = true;
     }
 
     return(success);

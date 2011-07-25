@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "melfa.h"
+#include "exceptions.h"
 
 int main(int argc, char* argv[])
 {
@@ -20,9 +21,19 @@ int main(int argc, char* argv[])
 
     arm_control::Melfa melfa(params);
 
-    if (!melfa.runProgram(program_file_name))
+    try
     {
-        std::cerr << "error running program" << std::endl;
+        melfa.connect();
+        melfa.init();
+        melfa.runProgram(program_file_name);
+    }
+    catch (arm_control::MelfaSerialConnectionError& err)
+    {
+        std::cerr << "Serial Connection error: " << err.what() << std::endl;
+    }
+    catch (arm_control::MelfaRobotError& err)
+    {
+        std::cerr << "Robot error: " << err.what() << std::endl;
     }
 
     return 0;

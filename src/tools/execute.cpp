@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "melfa.h"
+#include "exceptions.h"
 
 int main(int argc, char* argv[])
 {
@@ -20,14 +21,19 @@ int main(int argc, char* argv[])
     params.device = std::string(argv[1]);
 
     arm_control::Melfa melfa(params);
-    if (melfa.connect())
+    try
     {
+        melfa.connect();
+        melfa.init();
         melfa.execute(command);
     }
-    else
+    catch (arm_control::MelfaSerialConnectionError& err)
     {
-        std::cerr << "Connection attempt failed!" << std::endl;
-        return -2;
+        std::cerr << "Serial Connection error: " << err.what() << std::endl;
+    }
+    catch (arm_control::MelfaRobotError& err)
+    {
+        std::cerr << "Robot error: " << err.what() << std::endl;
     }
 
     return 0;

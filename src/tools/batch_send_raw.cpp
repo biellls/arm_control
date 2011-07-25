@@ -9,7 +9,7 @@ int main(int argc, char* argv[])
     if (argc != 3)
     {
         std::cerr << "Usage: " << argv[0] 
-            << " <device name> <program file name>" << std::endl;
+            << " <device name> <raw command file name>" << std::endl;
         return -1;
     }
 
@@ -35,8 +35,8 @@ int main(int argc, char* argv[])
         std::string command;
         while (getline(in, command))
         {
-            std::cout << "executing: " << command << std::endl;
-            melfa.execute(command);
+            std::cout << "sending raw command: " << command << std::endl;
+            melfa.sendRawCommand(command, 1);
         }
     }
     catch (arm_control::MelfaSerialConnectionError& err)
