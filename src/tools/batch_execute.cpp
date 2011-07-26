@@ -34,8 +34,13 @@ int main(int argc, char* argv[])
         std::string command;
         while (getline(in, command))
         {
+            while (melfa.isBusy()) usleep(1000);
             std::cout << "executing: " << command << std::endl;
             melfa.execute(command);
+            double x, y, z, roll, pitch, yaw;
+            melfa.getPose(x, y, z, roll, pitch, yaw);
+            std::cout << "current pose: (" << x << ", " << y << ", " << z << ") "
+                "(" << roll << ", " << pitch << ", " << yaw << ")" << std::endl;
         }
     }
     catch (arm_control::MelfaSerialConnectionError& err)

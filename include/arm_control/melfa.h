@@ -26,9 +26,20 @@ class Melfa
         };
 
         /**
+        * \brief creates a new Melfa instance with empty parameters.
+        * Don't forget to call setParams()!
+        */
+        Melfa();
+
+        /**
         * Create a new Melfa instance with given parameters
         */
         Melfa(const ConfigParams& params);
+
+        /**
+        * \brief set parameters
+        */
+        void setParams(const ConfigParams& params);
 
         /**
         * Destructor disconnects
@@ -93,10 +104,9 @@ class Melfa
 
         /**
         * \brief reads an answer from the robot. This method blocks until
-        * at least min_num_bytes are received. If min_num_bytes is 0, 
-        * on read is done anyways.
+        * the end marker '\r' was retrieved from the robot
         */
-        std::string receive(long unsigned int min_num_bytes = 3);
+        std::string receive();
 
         /**
         * \brief checks if the given answer is valid (starts with "QoK")

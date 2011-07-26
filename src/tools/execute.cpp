@@ -24,7 +24,10 @@ int main(int argc, char* argv[])
     try
     {
         melfa.connect();
+        std::cout << "Robot connected." << std::endl;
+        std::cout << "Executing command: " << command << std::endl;
         melfa.execute(command);
+        std::cout << "Execution finished." << std::endl;
     }
     catch (arm_control::MelfaSerialConnectionError& err)
     {
