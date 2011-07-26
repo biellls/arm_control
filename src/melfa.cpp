@@ -48,23 +48,15 @@ void ac::Melfa::connect()
         comm_.closeDevice(status);
         throw MelfaSerialConnectionError(error);
     }
+    initRobot();
     connected_ = true;
-}
-
-void ac::Melfa::init()
-{
-    sendRawCommand("OPEN=NARCUSR", 1);
-    sendRawCommand("CNTLON", 1);
-    sendRawCommand("RSTPRG", 1);
-    sendRawCommand("PRGLOAD=COSIROP", 1);
 }
 
 void ac::Melfa::disconnect()
 {
     if (connected_)
     {
-        sendRawCommand("CNTLOFF", 1);
-        sendRawCommand("CLOSE", 1);
+        deInitRobot();
         int status;
         comm_.closeDevice(status);
         connected_ = false;
@@ -73,11 +65,10 @@ void ac::Melfa::disconnect()
 
 bool ac::Melfa::isBusy()
 {
-    sendRawCommand("STATE", 1);
-    std::string answer;
-    readAnswer(answer, 53);
+    send("1;1;STATE");
+    std::string answer = receive(53);
     checkAnswer(answer);
-    if (answer[answer.length() - 1] == '0')
+    if (answer[answer.length() - 1] == '1')
     {
         return true;
     }
@@ -87,48 +78,93 @@ bool ac::Melfa::isBusy()
     }
 }
 
-void ac::Melfa::execute(const std::string& command)
+void ac::Melfa::getPose(double& x, double& y, double& z,
+        double& roll, double& pitch, double& yaw)
 {
-   sendRawCommand("EXEC" + command, 1);
+    readPos("1", x);
+    readPos("2", y);
+    readPos("3", z);
+    readPos("4", roll);
+    readPos("5", pitch);
+    readPos("6", yaw);
 }
 
-void ac::Melfa::runProgram(const std::string& command)
+void ac::Melfa::execute(const std::string& command)
 {
-    throw MelfaException("Melfa::runProgram(): not implemented!");
+    while (isBusy()) usleep(100000);
+    sendRawCommand("EXEC" + command, 1);
 }
 
 void ac::Melfa::sendRawCommand(const std::string& command, int slot)
 {
-    if (!connected_)
-        throw MelfaRobotError("Melfa::sendRawCommand(): Robot not connected!");
     std::stringstream stream;
     stream << "1;" << slot << ";" << command << "\r";
-    std::string command_string = stream.str().c_str();
-    long unsigned int num_bytes_to_write = command_string.length();
+    send(stream.str());
+    std::string answer = receive();
+    checkAnswer(answer);
+}
+
+void ac::Melfa::initRobot()
+{
+    sendRawCommand("OPEN=NARCUSR", 1);
+    sendRawCommand("CNTLON", 1);
+    sendRawCommand("SLOTINIT", 1);
+    sendRawCommand("PRGLOAD=COSIROP", 1);
+    sendRawCommand("OVRD=3", 1);
+}
+
+void ac::Melfa::deInitRobot()
+{
+    sendRawCommand("CNTLOFF", 1);
+    sendRawCommand("CLOSE", 1);
+}
+
+void ac::Melfa::readPos(const std::string& id, double& pos)
+{
+    // answer of robot is
+    // QoK<axis name>;<position>;;.....
+    // example:
+    // QoKX;526.34;;6.0;10;0.00;00000000
+    send("1;1;PPOS" + id);
+    std::string answer = receive(28);
+    checkAnswer(answer);
+    int start_pos = 5;
+    int end_pos = answer.find(";", start_pos);
+    int length = end_pos - start_pos;
+    std::string num_string = answer.substr(start_pos, length);
+    std::istringstream iss(num_string);
+    iss >> pos;
+}
+
+void ac::Melfa::send(const std::string& command)
+{
+    if (!connected_)
+        throw MelfaSerialConnectionError("Melfa::send(): Robot not connected!");
+    long unsigned int num_bytes_to_write = command.length();
     long unsigned int num_bytes_written;
     int status;
     bool write_ok = comm_.writeData(num_bytes_to_write,
-            command_string.c_str(), num_bytes_written, status);
+            command.c_str(), num_bytes_written, status);
     if (!write_ok || num_bytes_written != num_bytes_to_write)
     {
-        throw MelfaSerialConnectionError("Melfa::sendRawCommand(): error writing to device!");
+        throw MelfaSerialConnectionError("Melfa::send(): error writing to device!");
     }
     else
     {
-        ROS_INFO_STREAM("Melfa::sendRawCommand(): sent: " << command_string);
+        ROS_INFO_STREAM("Melfa::send(): sent: " << command);
     }
 }
 
-void ac::Melfa::readAnswer(std::string& answer, long unsigned int min_num_bytes)
+std::string ac::Melfa::receive(long unsigned int min_num_bytes)
 {
     if (!connected_)
-        throw MelfaRobotError("Melfa::readAnswer(): Robot not connected!");
-    answer = "";
+        throw MelfaSerialConnectionError("Melfa::receive(): Robot not connected!");
+    std::string answer = "";
     // there is no specific end marker in messages from the robot :-(
     int buffer_size = 4096;
     char buffer[buffer_size];
     long unsigned int total_num_bytes_read = 0;
-    while (total_num_bytes_read < min_num_bytes)
+    do
     {
         long unsigned int num_bytes_to_read = buffer_size;
         long unsigned int num_bytes_read;
@@ -140,10 +176,11 @@ void ac::Melfa::readAnswer(std::string& answer, long unsigned int min_num_bytes)
             throw MelfaSerialConnectionError("Melfa::readAnswer(): error reading from device!");
         }
         std::string buffer_string(buffer, num_bytes_read);
-        ROS_INFO_STREAM("Melfa::readAnswer(): received: " << buffer_string);
+        ROS_INFO_STREAM("Melfa::receive(): received: " << buffer_string);
         answer += buffer_string;
         total_num_bytes_read += num_bytes_read;
-    }
+    } while (total_num_bytes_read < min_num_bytes);
+    return answer;
 }
 
 void ac::Melfa::checkAnswer(const std::string& answer)

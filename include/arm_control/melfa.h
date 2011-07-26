@@ -41,11 +41,6 @@ class Melfa
         void connect();
 
         /**
-        * \brief initializes the robot. call after connect.
-        */
-        void init();
-
-        /**
         * \brief disconnects from the robot
         */
         void disconnect();
@@ -57,31 +52,57 @@ class Melfa
         bool isBusy();
 
         /**
+        * \brief retrieve the current pose
+        */
+        void getPose(double& x, double& y, double& z, 
+                double& roll, double& pitch, double& yaw);
+
+        /**
         * \brief executes the given MELFA BASIC IV command
         */
         void execute(const std::string& command);
 
         /**
-        * \brief runs a MELFA BASIC IV program given by file_name
-        */
-        void runProgram(const std::string& file_name);
-
-        /**
         * \brief sends the give command directly to the robot on given slot
         * Carriage return at end of command is added inside this method.
+        * \return the answer from the robot
         */
         void sendRawCommand(const std::string& command, int slot);
 
+    protected:
+
+        /**
+        * \brief initializes the robot. called in connect.
+        */
+        void initRobot();
+
+        /**
+        * \brief de-initializes the robot. called in disconnect.
+        */
+        void deInitRobot();
+
+        /**
+        * \brief reads a position
+        */
+        void readPos(const std::string& id, double& pos);
+
+        /**
+        * \brief sends given data through the serial connections
+        */
+        void send(const std::string& data);
+
         /**
         * \brief reads an answer from the robot. This method blocks until
-        * at least min_num_bytes are received.
+        * at least min_num_bytes are received. If min_num_bytes is 0, 
+        * on read is done anyways.
         */
-        void readAnswer(std::string& answer, long unsigned int min_num_bytes = 3);
+        std::string receive(long unsigned int min_num_bytes = 3);
 
         /**
         * \brief checks if the given answer is valid (starts with "QoK")
         */
         void checkAnswer(const std::string& answer);
+
 
     private:
 

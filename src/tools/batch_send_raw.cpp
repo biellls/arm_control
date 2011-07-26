@@ -31,7 +31,6 @@ int main(int argc, char* argv[])
     try
     {
         melfa.connect();
-        melfa.init();
         std::string command;
         while (getline(in, command))
         {
