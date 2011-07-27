@@ -10,6 +10,7 @@
   <url>http://ros.org/wiki/arm_control</url>
   <depend package="roscpp"/>
   <depend package="tf"/>
+  <depend package="actionlib_msgs"/>
 
 </package>
 

@@ -1,0 +1,9 @@
+# goal
+geometry_msgs/Pose target_pose
+---
+# result
+geometry_msgs/Pose end_pose
+---
+# feedback
+geometry_msgs/Pose current_pose
+
