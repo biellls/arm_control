@@ -35,7 +35,7 @@ int main(int argc, char* argv[])
         while (getline(in, command))
         {
             std::cout << "sending raw command: " << command << std::endl;
-            melfa.sendRawCommand(command, 1);
+            melfa.sendCommand(command);
         }
     }
     catch (arm_control::MelfaSerialConnectionError& err)

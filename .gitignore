@@ -10,6 +10,7 @@ src/*_msgs/msg/_*.py
 src/*_msgs/msg/_*.pyc
 src/*_msgs/_*.py
 src/*_msgs/_*.pyc
+src/*/*/_*.py*
 msg/lisp/
 srv_gen/
 src/*/srv/_*.py

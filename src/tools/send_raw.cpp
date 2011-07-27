@@ -25,7 +25,7 @@ int main(int argc, char* argv[])
     try
     {
         melfa.connect();
-        melfa.sendRawCommand(command, 1);
+        melfa.sendCommand(command);
     }
     catch (arm_control::MelfaSerialConnectionError& err)
     {

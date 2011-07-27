@@ -2,6 +2,7 @@
 #define MELFA_H
 
 #include <string>
+#include <vector>
 
 #include "serialcomm.h"
 
@@ -74,11 +75,11 @@ class Melfa
         void execute(const std::string& command);
 
         /**
-        * \brief sends the give command directly to the robot on given slot
-        * Carriage return at end of command is added inside this method.
-        * \return the answer from the robot
+        * \brief top-level low-level communication, calls the following
+        *        three methods one after the other: write() read() checkAnswer() parseAnswer()
+        * \return parsed checked answer of the robot
         */
-        void sendRawCommand(const std::string& command, int slot);
+        std::vector<std::string> sendCommand(const std::string& command);
 
     protected:
 
@@ -100,19 +101,25 @@ class Melfa
         /**
         * \brief sends given data through the serial connections
         */
-        void send(const std::string& data);
+        void write(const std::string& data);
 
         /**
         * \brief reads an answer from the robot. This method blocks until
         * the end marker '\r' was retrieved from the robot
         */
-        std::string receive();
+        std::string read();
 
         /**
         * \brief checks if the given answer is valid (starts with "QoK")
+        * Throws an exception if the answer indicates an error.
         */
         void checkAnswer(const std::string& answer);
 
+        /**
+        * \brief parses the given answer by splitting it using delimiter ";"
+        * \return the elements
+        */
+        std::vector<std::string> parseAnswer(const std::string& answer) const;
 
     private:
 
