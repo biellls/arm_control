@@ -3,6 +3,8 @@
 #include <ros/ros.h>
 
 #include <tf/transform_broadcaster.h>
+#include <actionlib/server/simple_action_server.h>
+#include "arm_control/MoveArmAction.h"
 
 #include "melfa.h"
 #include "exceptions.h"
@@ -19,10 +21,11 @@ class ArmControlNode
     ac::Melfa melfa_;
     ros::Timer timer_;
 
+    actionlib::SimpleActionServer<ac::MoveArmAction> action_server_;
     std::queue<std::string> command_queue_;
 
   public:
-    ArmControlNode() : nh_private_("~")
+    ArmControlNode() : nh_private_("~"), action_server_(nh_, "arm_control_action_server", false)
     {
         init();
     }
@@ -55,41 +58,85 @@ class ArmControlNode
             ROS_ERROR("Robot error: %s", err.what());
         }
 
-        timer_ = nh_.createTimer(ros::Duration(0.05), boost::bind(&ArmControlNode::checkAction, this)); 
+        timer_ = nh_.createTimer(ros::Duration(0.05), boost::bind(&ArmControlNode::reportPose, this)); 
+        action_server_.registerGoalCallback(boost::bind(&ArmControlNode::goalCB, this));
+        action_server_.start();
     }
 
-    void checkAction()
+    void goalCB()
     {
-        if (command_queue_.size() > 0 && !melfa_.isBusy())
+        ac::MoveArmGoalConstPtr goal = action_server_.acceptNewGoal();
+        tf::Quaternion quat;
+        tf::quaternionMsgToTF(goal->target_pose.orientation, quat);
+        double x, y, z, roll, pitch, yaw;
+        x = goal->target_pose.position.x;
+        y = goal->target_pose.position.y;
+        z = goal->target_pose.position.z;
+        btMatrix3x3(quat).getRPY(roll, pitch, yaw);
+
+        try
         {
-            melfa_.execute(command_queue_.front());
-            command_queue_.pop();
+            melfa_.moveTo(x, y, z, roll, pitch, yaw);
+            while (melfa_.isBusy() && ros::ok())
+            {
+                // get current pose as feedback
+                ac::MoveArmFeedback feedback;
+                tf::poseTFToMsg(retrievePose(), feedback.current_pose);
+                action_server_.publishFeedback(feedback);
+
+                if (action_server_.isPreemptRequested())
+                {
+                    ROS_INFO("MoveArmAction preemted.");
+                    action_server_.setPreempted();
+                    melfa_.stop();
+                    break;
+                }
+            }
         }
-        reportPose();
+        catch (const ac::MelfaException& e)
+        {
+            ROS_ERROR("Exception occured when moving robot: %s", e.what());
+            action_server_.setAborted();
+        }
+        // motion is finished
+        ac::MoveArmResult result;
+        tf::poseTFToMsg(retrievePose(), result.end_pose);
+        action_server_.setSucceeded(result);
+    }
+
+    /// reads the pose from the robot and fills the given tf struct
+    tf::Pose retrievePose()
+    {
+        try
+        {
+            double x, y, z, roll, pitch, yaw;
+            melfa_.getPose(x, y, z, roll, pitch, yaw);
+            tf::Quaternion quat;
+            quat.setRPY(roll, pitch, yaw);
+            tf::Pose pose(quat, tf::Vector3(x, y, z));
+            return pose;
+        }
+        catch (const ac::MelfaException& e)
+        {
+            ROS_ERROR("Exception occured when trying to retrieve robot pose: %s", e.what());
+            action_server_.setAborted();
+        }
+        return tf::Pose();
     }
 
     void reportPose()
     {
-        double x, y, z, roll, pitch, yaw;
-        ros::Time timestamp = ros::Time::now();
-        melfa_.getPose(x, y, z, roll, pitch, yaw);
-
-        tf::Vector3 translation(x, y, z);
-        tf::Quaternion quat;
-        quat.setRPY(roll, pitch, yaw);
-
-        tf::Pose tf_pose(quat, translation);
         geometry_msgs::PoseStamped pose_stamped;
+        tf::Pose pose = retrievePose();
+        ros::Time timestamp = ros::Time::now();
         pose_stamped.header.stamp = timestamp;
         pose_stamped.header.frame_id = "base_link";
-
-        tf::poseTFToMsg(tf_pose, pose_stamped.pose);
-
+        tf::poseTFToMsg(pose, pose_stamped.pose);
         pose_pub_.publish(pose_stamped);
 
         tf_broadcaster_.sendTransform(
                 tf::StampedTransform(
-                    tf::Transform(tf_pose),
+                    tf::Transform(pose),
                     timestamp, "base_link", "camera"));
     }
 };

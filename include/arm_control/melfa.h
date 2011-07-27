@@ -3,6 +3,7 @@
 
 #include <string>
 #include <vector>
+#include <boost/thread/mutex.hpp>
 
 #include "serialcomm.h"
 
@@ -13,6 +14,7 @@ namespace arm_control
 * \class Melfa
 * \brief Communication with a melfa robot
 * Errors are communicated via exceptions (see MelfaException and subclasses)
+* This class is partly thread-safe, i.e. all serial communication is protected by a mutex
 */
 class Melfa
 {
@@ -65,9 +67,22 @@ class Melfa
 
         /**
         * \brief retrieve the current pose
+        * x, y, and z are given in meters, roll, pitch and yaw in radiants
         */
         void getPose(double& x, double& y, double& z, 
                 double& roll, double& pitch, double& yaw);
+
+        /**
+        * \brief sends a move command to given pose
+        * x, y, and z have to be given in meters, roll, pitch, and yaw in radiants
+        */
+        void moveTo(double x, double y, double z, 
+                double roll, double pitch, double yaw);
+
+        /**
+        * \brief sends a stop command to the robot
+        */
+        void stop();
 
         /**
         * \brief executes the given MELFA BASIC IV command
@@ -123,6 +138,8 @@ class Melfa
 
     private:
 
+        boost::mutex comm_mutex_; // mutex to protect communication
+        boost::mutex connection_mutex_; // mutex to protect connection/disconnection
         ConfigParams params_;
         bool connected_;
         serial::SerialComm comm_;

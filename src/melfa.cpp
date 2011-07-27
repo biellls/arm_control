@@ -1,10 +1,20 @@
 #include <ros/ros.h>
 #include <sstream>
+#include <iomanip>
 
 #include "exceptions.h"
 #include "melfa.h"
 
 namespace ac = arm_control;
+
+
+// formats the value to have 2 digits after the comma
+std::string format(double val)
+{
+    std::ostringstream ss;
+    ss << std::fixed << std::setprecision(2) << val;
+    return ss.str();
+}
 
 ac::Melfa::Melfa() : connected_(false)
 {
@@ -27,45 +37,51 @@ ac::Melfa::~Melfa()
 
 void ac::Melfa::connect()
 {
+    boost::mutex::scoped_lock connection_lock(connection_mutex_);
     int status;
-    if (!comm_.openDevice(params_.device, status))
-        throw MelfaSerialConnectionError("Melfa::connect(): could not open device.");
-
-    std::string error("Melfa::connect():");
-    bool ok;
-    bool all_ok = true;
-    ok = comm_.setBaudRate(9600);
-    all_ok &= ok;
-    if (!ok) error += " cannot set baud rate";
-    ok = comm_.setDataBits(serial::SerialComm::DB8);
-    all_ok &= ok;
-    if (!ok) error += " cannot set data bits";
-    ok = comm_.setStopBits(serial::SerialComm::TWO_STOP_BITS);
-    all_ok &= ok;
-    if (!ok) error += " cannot set stop bits";
-    ok = comm_.setParity(serial::SerialComm::EVEN_PARITY); 
-    all_ok &= ok;
-    if (!ok) error += " cannot set parity";
-    ok = comm_.initRawComm(status);
-    all_ok &= ok;
-    if (!ok) error += " cannot init comm";
-    ok = comm_.setReadTimeout(2000);
-    all_ok &= ok;
-    if (!ok) error += " cannot set read timeout";
-    if (!all_ok)
     {
-        comm_.closeDevice(status);
-        throw MelfaSerialConnectionError(error);
+        boost::mutex::scoped_lock lock(comm_mutex_);
+        if (!comm_.openDevice(params_.device, status))
+            throw MelfaSerialConnectionError("Melfa::connect(): could not open device.");
+
+        std::string error("Melfa::connect():");
+        bool ok;
+        bool all_ok = true;
+        ok = comm_.setBaudRate(9600);
+        all_ok &= ok;
+        if (!ok) error += " cannot set baud rate";
+        ok = comm_.setDataBits(serial::SerialComm::DB8);
+        all_ok &= ok;
+        if (!ok) error += " cannot set data bits";
+        ok = comm_.setStopBits(serial::SerialComm::TWO_STOP_BITS);
+        all_ok &= ok;
+        if (!ok) error += " cannot set stop bits";
+        ok = comm_.setParity(serial::SerialComm::EVEN_PARITY); 
+        all_ok &= ok;
+        if (!ok) error += " cannot set parity";
+        ok = comm_.initRawComm(status);
+        all_ok &= ok;
+        if (!ok) error += " cannot init comm";
+        ok = comm_.setReadTimeout(2000);
+        all_ok &= ok;
+        if (!ok) error += " cannot set read timeout";
+        if (!all_ok)
+        {
+            comm_.closeDevice(status);
+            throw MelfaSerialConnectionError(error);
+        }
+        connected_ = true;
     }
-    connected_ = true;
     initRobot();
 }
 
 void ac::Melfa::disconnect()
 {
+    boost::mutex::scoped_lock connection_lock(connection_mutex_);
     if (connected_)
     {
         deInitRobot();
+        boost::mutex::scoped_lock lock(comm_mutex_);
         int status;
         comm_.closeDevice(status);
         connected_ = false;
@@ -95,6 +111,23 @@ void ac::Melfa::getPose(double& x, double& y, double& z,
     }
 }
 
+void ac::Melfa::moveTo(double x, double y, double z,
+        double roll, double pitch, double yaw)
+{
+    execute("P1.X=" + format(x * 1000));
+    execute("P1.Y=" + format(y * 1000));
+    execute("P1.Z=" + format(z * 1000));
+    execute("P1.A=" + format(roll / M_PI * 180));
+    execute("P1.B=" + format(pitch / M_PI * 180));
+    execute("P1.C=" + format(yaw / M_PI * 180));
+    execute("MVS P1");
+}
+
+void ac::Melfa::stop()
+{
+    sendCommand("STOP");
+}
+
 void ac::Melfa::execute(const std::string& command)
 {
     sendCommand("1;1;EXEC" + command);
@@ -102,6 +135,7 @@ void ac::Melfa::execute(const std::string& command)
 
 std::vector<std::string> ac::Melfa::sendCommand(const std::string& command)
 {
+    boost::mutex::scoped_lock lock(comm_mutex_);
     write(command + "\r");
     std::string answer = read();
     checkAnswer(answer);
