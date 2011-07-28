@@ -91,7 +91,8 @@ void ac::Melfa::disconnect()
 bool ac::Melfa::isBusy()
 {
     std::vector<std::string> state_msg = sendCommand("1;1;STATE");
-    if (state_msg[state_msg.size() - 1] == "1")
+    std::string busy_flag = state_msg[state_msg.size() - 1];
+    if (busy_flag == "1")
     {
         return true;
     }
@@ -235,7 +236,13 @@ void ac::Melfa::checkAnswer(const std::string& answer)
 std::vector<std::string> ac::Melfa::parseAnswer(const std::string& answer) const
 {
     std::vector<std::string> elements;
-    std::stringstream ss(answer.substr(4)); // skip leading "QoK"
+    int start;
+    if (answer[3] == ';')
+        start = 4;
+    else
+        start = 3;
+    // -1 here to strip the trailing '\r'
+    std::stringstream ss(answer.substr(start, answer.length() - start - 1));
     std::string item;
     while(std::getline(ss, item, ';')) {
         elements.push_back(item);
