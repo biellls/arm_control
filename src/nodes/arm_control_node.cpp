@@ -1,5 +1,3 @@
-#include <queue>
-
 #include <ros/ros.h>
 
 #include <tf/transform_broadcaster.h>
@@ -22,7 +20,6 @@ class ArmControlNode
     ros::Timer timer_;
 
     actionlib::SimpleActionServer<ac::MoveArmAction> action_server_;
-    std::queue<std::string> command_queue_;
 
   public:
     ArmControlNode() : nh_private_("~"), action_server_(nh_, "arm_control_action_server", false)

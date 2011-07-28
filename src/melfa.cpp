@@ -146,7 +146,7 @@ void ac::Melfa::initRobot()
 {
     sendCommand("1;1;OPEN=NARCUSR");
     sendCommand("1;1;CNTLON");
-    sendCommand("1;1;RSTPRG");
+    sendCommand("1;1;RSTPRG"); // or SLOTINIT?
     sendCommand("1;1;PRGLOAD=COSIROP");
     sendCommand("1;1;OVRD=3");
 }
