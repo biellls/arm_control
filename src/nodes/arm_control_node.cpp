@@ -33,7 +33,7 @@ class ArmControlNode
 
     void init()
     {
-        pose_pub_ = nh_.advertise<geometry_msgs::Pose>("pose", 1);
+        pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("pose", 1);
 
         std::string device;
         nh_private_.param<std::string>("device", device, "/dev/ttyUSB0");
@@ -104,38 +104,39 @@ class ArmControlNode
     /// reads the pose from the robot and fills the given tf struct
     tf::Pose retrievePose()
     {
+        double x, y, z, roll, pitch, yaw;
+        melfa_.getPose(x, y, z, roll, pitch, yaw);
+        tf::Quaternion quat;
+        quat.setRPY(roll, pitch, yaw);
+        tf::Pose pose(quat, tf::Vector3(x, y, z));
+        ROS_INFO("Retrieved pose: %f %f %f, %f %f %f", x, y, z, roll, pitch, yaw);
+        return pose;
+    }
+
+    void reportPose()
+    {
         try
         {
-            double x, y, z, roll, pitch, yaw;
-            melfa_.getPose(x, y, z, roll, pitch, yaw);
-            tf::Quaternion quat;
-            quat.setRPY(roll, pitch, yaw);
-            tf::Pose pose(quat, tf::Vector3(x, y, z));
-            return pose;
+            geometry_msgs::PoseStamped pose_stamped;
+            tf::Pose pose = retrievePose();
+            ros::Time timestamp = ros::Time::now();
+            pose_stamped.header.stamp = timestamp;
+            pose_stamped.header.frame_id = "base_link";
+            tf::poseTFToMsg(pose, pose_stamped.pose);
+            ROS_INFO_STREAM("pose: " << pose_stamped.pose.position.x);
+            pose_pub_.publish(pose_stamped);
+
+            tf_broadcaster_.sendTransform(
+                    tf::StampedTransform(
+                        tf::Transform(pose),
+                        timestamp, "base_link", "camera"));
         }
         catch (const ac::MelfaException& e)
         {
             ROS_ERROR("Exception occured when trying to retrieve robot pose: %s", e.what());
             action_server_.setAborted();
         }
-        return tf::Pose();
-    }
-
-    void reportPose()
-    {
-        geometry_msgs::PoseStamped pose_stamped;
-        tf::Pose pose = retrievePose();
-        ros::Time timestamp = ros::Time::now();
-        pose_stamped.header.stamp = timestamp;
-        pose_stamped.header.frame_id = "base_link";
-        tf::poseTFToMsg(pose, pose_stamped.pose);
-        pose_pub_.publish(pose_stamped);
-
-        tf_broadcaster_.sendTransform(
-                tf::StampedTransform(
-                    tf::Transform(pose),
-                    timestamp, "base_link", "camera"));
-    }
+     }
 };
 
 int main(int argc, char** argv)

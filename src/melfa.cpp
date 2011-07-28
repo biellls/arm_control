@@ -105,10 +105,16 @@ void ac::Melfa::getPose(double& x, double& y, double& z,
         double& roll, double& pitch, double& yaw)
 {
     std::vector<std::string> pose_msg = sendCommand("1;1;PPOSF");
-    for (size_t i = 0; i < pose_msg.size(); ++i)
+    if (pose_msg.size() < 12)
     {
-        std::cout << i << ": " << pose_msg[i] << std::endl;
+        throw MelfaRobotError("Melfa::getPose(): Robot answer too small!");
     }
+    x = atof(pose_msg[1].c_str()) / 1000;
+    y = atof(pose_msg[3].c_str()) / 1000;
+    z = atof(pose_msg[5].c_str()) / 1000;
+    roll = atof(pose_msg[7].c_str()) / 180 * M_PI;
+    pitch = atof(pose_msg[9].c_str()) / 180 * M_PI;
+    yaw = atof(pose_msg[11].c_str()) / 180 * M_PI;
 }
 
 void ac::Melfa::moveTo(double x, double y, double z,
