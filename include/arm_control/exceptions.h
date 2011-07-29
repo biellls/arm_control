@@ -22,5 +22,11 @@ class MelfaRobotError : public MelfaException
         MelfaRobotError(const std::string& what) : MelfaException(what) {}
 };
 
+class MelfaRobotBusyException : public MelfaRobotError
+{
+    public:
+        MelfaRobotBusyException(const std::string& what) : MelfaRobotError(what) {}
+};
+
 
 }

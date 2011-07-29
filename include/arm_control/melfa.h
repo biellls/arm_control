@@ -10,6 +10,8 @@
 namespace arm_control
 {
 
+struct RobotPose;
+
 /**
 * \class Melfa
 * \brief Communication with a melfa robot
@@ -67,22 +69,34 @@ class Melfa
 
         /**
         * \brief retrieve the current pose
-        * x, y, and z are given in meters, roll, pitch and yaw in radiants
         */
-        void getPose(double& x, double& y, double& z, 
-                double& roll, double& pitch, double& yaw);
+        RobotPose getPose();
 
         /**
         * \brief sends a move command to given pose
         * x, y, and z have to be given in meters, roll, pitch, and yaw in radiants
         */
-        void moveTo(double x, double y, double z, 
-                double roll, double pitch, double yaw);
+        void moveTo(const RobotPose& pose);
 
         /**
         * \brief sends a stop command to the robot
         */
         void stop();
+
+        /**
+        * \brief sets the maximum velocity to given m/s
+        */
+        void setMaximumVelocity(double velocity);
+
+        /**
+        * \brief sets the acceleration in % (10 = 10%)
+        */
+        void setAcceleration(double percentage);
+
+        /**
+        * \brief sets the tool pose (the point that is moved)
+        */
+        void setToolPose(const RobotPose& pose);
 
         /**
         * \brief executes the given MELFA BASIC IV command

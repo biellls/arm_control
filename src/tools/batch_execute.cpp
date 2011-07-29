@@ -2,6 +2,7 @@
 #include <iostream>
 
 #include "melfa.h"
+#include "robot_pose.h"
 #include "exceptions.h"
 
 int main(int argc, char* argv[])
@@ -34,13 +35,16 @@ int main(int argc, char* argv[])
         std::string command;
         while (getline(in, command))
         {
-            while (melfa.isBusy()) usleep(1000);
+            while (melfa.isBusy())
+            {
+                std::cout << "Melfa is busy, waiting" << std::endl;
+                sleep(1);
+            }
             std::cout << "executing: " << command << std::endl;
             melfa.execute(command);
-            double x, y, z, roll, pitch, yaw;
-            melfa.getPose(x, y, z, roll, pitch, yaw);
-            std::cout << "current pose: (" << x << ", " << y << ", " << z << ") "
-                "(" << roll << ", " << pitch << ", " << yaw << ")" << std::endl;
+            arm_control::RobotPose pose = melfa.getPose();
+            std::cout << "current pose: (" << pose.x << ", " << pose.y << ", " << pose.z << ") "
+                "(" << pose.roll << ", " << pose.pitch << ", " << pose.yaw << ")" << std::endl;
         }
     }
     catch (arm_control::MelfaSerialConnectionError& err)

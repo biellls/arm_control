@@ -1,3 +1,5 @@
+#include <queue>
+
 #include <ros/ros.h>
 
 #include <tf/transform_broadcaster.h>
@@ -5,6 +7,7 @@
 #include "arm_control/MoveArmAction.h"
 
 #include "melfa.h"
+#include "robot_pose.h"
 #include "exceptions.h"
 
 namespace ac = arm_control;
@@ -20,6 +23,8 @@ class ArmControlNode
     ros::Timer timer_;
 
     actionlib::SimpleActionServer<ac::MoveArmAction> action_server_;
+
+    std::queue<ac::RobotPose> way_points_;
 
   public:
     ArmControlNode() : nh_private_("~"), action_server_(nh_, "arm_control_action_server", false)
@@ -63,30 +68,47 @@ class ArmControlNode
     void goalCB()
     {
         ac::MoveArmGoalConstPtr goal = action_server_.acceptNewGoal();
-        tf::Quaternion quat;
-        tf::quaternionMsgToTF(goal->target_pose.orientation, quat);
-        double x, y, z, roll, pitch, yaw;
-        x = goal->target_pose.position.x;
-        y = goal->target_pose.position.y;
-        z = goal->target_pose.position.z;
-        btMatrix3x3(quat).getRPY(roll, pitch, yaw);
-
+        way_points_ = readWayPoints(goal->path);
         try
         {
-            melfa_.moveTo(x, y, z, roll, pitch, yaw);
-            while (melfa_.isBusy() && ros::ok())
+            // set parameters
+            melfa_.setMaximumVelocity(goal->maximum_velocity);
+            melfa_.setAcceleration(goal->acceleration);
+            ac::RobotPose tool_pose;
+            poseMsgToRobot(goal->tool_pose, tool_pose);
+            melfa_.setToolPose(tool_pose);
+            while (way_points_.size() > 0 && ros::ok())
             {
-                // get current pose as feedback
-                ac::MoveArmFeedback feedback;
-                tf::poseTFToMsg(retrievePose(), feedback.current_pose);
-                action_server_.publishFeedback(feedback);
-
-                if (action_server_.isPreemptRequested())
+                try
                 {
-                    ROS_INFO("MoveArmAction preemted.");
-                    action_server_.setPreempted();
-                    melfa_.stop();
-                    break;
+                    // get current pose as feedback
+                    ac::MoveArmFeedback feedback;
+                    tf::poseTFToMsg(retrievePose(), feedback.current_pose);
+                    action_server_.publishFeedback(feedback);
+
+                    if (action_server_.isPreemptRequested())
+                    {
+                        ROS_INFO("MoveArmAction preempted.");
+                        action_server_.setPreempted();
+                        melfa_.stop();
+                        break;
+                    }
+                    ac::RobotPose& next_target_pose = way_points_.front();
+                    melfa_.moveTo(next_target_pose);
+                    way_points_.pop();
+                    ROS_INFO("Sent next way point to robot: %f %f %f, %f %f %f",
+                            next_target_pose.x,
+                            next_target_pose.y,
+                            next_target_pose.z,
+                            next_target_pose.roll,
+                            next_target_pose.pitch,
+                            next_target_pose.yaw);
+                }
+                catch (const ac::MelfaRobotBusyException&)
+                {
+                    // move command failed because robot is busy, wait a little
+                    ROS_INFO("Robot is busy, waiting 1 second to send next waypoint.");
+                    sleep(1);
                 }
             }
         }
@@ -101,16 +123,44 @@ class ArmControlNode
         action_server_.setSucceeded(result);
     }
 
+    std::queue<ac::RobotPose> readWayPoints(const geometry_msgs::PoseArray& pose_array) const
+    {
+        std::queue<ac::RobotPose> way_points;
+        for (size_t i = 0; i < pose_array.poses.size(); ++i)
+        {
+            const geometry_msgs::Pose& pose = pose_array.poses[i];
+            ac::RobotPose way_point;
+            poseMsgToRobot(pose, way_point);
+            way_points.push(way_point);
+        }
+        return way_points;
+    }
+
+    void poseMsgToRobot(const geometry_msgs::Pose& pose_msg, ac::RobotPose& robot_pose) const
+    {
+        robot_pose.x = pose_msg.position.x;
+        robot_pose.y = pose_msg.position.y;
+        robot_pose.z = pose_msg.position.z;
+        tf::Quaternion quat;
+        tf::quaternionMsgToTF(pose_msg.orientation, quat);
+        btMatrix3x3(quat).getRPY(robot_pose.roll, robot_pose.pitch, robot_pose.yaw);
+    }
+
     /// reads the pose from the robot and fills the given tf struct
     tf::Pose retrievePose()
     {
-        double x, y, z, roll, pitch, yaw;
-        melfa_.getPose(x, y, z, roll, pitch, yaw);
+        ac::RobotPose robot_pose = melfa_.getPose();
         tf::Quaternion quat;
-        quat.setRPY(roll, pitch, yaw);
-        tf::Pose pose(quat, tf::Vector3(x, y, z));
-        ROS_INFO("Retrieved pose: %f %f %f, %f %f %f", x, y, z, roll, pitch, yaw);
-        return pose;
+        quat.setRPY(robot_pose.roll, robot_pose.pitch, robot_pose.yaw);
+        tf::Pose tf_pose(quat, tf::Vector3(robot_pose.x, robot_pose.y, robot_pose.z));
+        ROS_DEBUG("Retrieved pose: %f %f %f, %f %f %f", 
+                robot_pose.x, 
+                robot_pose.y, 
+                robot_pose.z, 
+                robot_pose.roll, 
+                robot_pose.pitch, 
+                robot_pose.yaw);
+        return tf_pose;
     }
 
     void reportPose()
@@ -123,7 +173,6 @@ class ArmControlNode
             pose_stamped.header.stamp = timestamp;
             pose_stamped.header.frame_id = "base_link";
             tf::poseTFToMsg(pose, pose_stamped.pose);
-            ROS_INFO_STREAM("pose: " << pose_stamped.pose.position.x);
             pose_pub_.publish(pose_stamped);
 
             tf_broadcaster_.sendTransform(
