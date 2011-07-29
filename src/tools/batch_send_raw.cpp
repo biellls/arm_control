@@ -1,8 +1,8 @@
 #include <fstream>
 #include <iostream>
 
-#include "melfa.h"
-#include "exceptions.h"
+#include "melfa/melfa.h"
+#include "melfa/exceptions.h"
 
 int main(int argc, char* argv[])
 {
@@ -23,10 +23,10 @@ int main(int argc, char* argv[])
         return -3;
     }
  
-    arm_control::Melfa::ConfigParams params;
+    melfa::Melfa::ConfigParams params;
     params.device = std::string(argv[1]);
 
-    arm_control::Melfa melfa(params);
+    melfa::Melfa melfa(params);
     
     try
     {
@@ -38,11 +38,11 @@ int main(int argc, char* argv[])
             melfa.sendCommand(command);
         }
     }
-    catch (arm_control::MelfaSerialConnectionError& err)
+    catch (melfa::MelfaSerialConnectionError& err)
     {
         std::cerr << "Serial Connection error: " << err.what() << std::endl;
     }
-    catch (arm_control::MelfaRobotError& err)
+    catch (melfa::MelfaRobotError& err)
     {
         std::cerr << "Robot error: " << err.what() << std::endl;
     }

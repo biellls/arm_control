@@ -6,9 +6,9 @@
 #include <actionlib/server/simple_action_server.h>
 #include "arm_control/MoveArmAction.h"
 
-#include "melfa.h"
-#include "robot_pose.h"
-#include "exceptions.h"
+#include "melfa/melfa.h"
+#include "melfa/robot_pose.h"
+#include "melfa/exceptions.h"
 
 namespace ac = arm_control;
 
@@ -19,12 +19,12 @@ class ArmControlNode
 
     ros::Publisher pose_pub_;
     tf::TransformBroadcaster tf_broadcaster_;
-    ac::Melfa melfa_;
+    melfa::Melfa melfa_;
     ros::Timer timer_;
 
     actionlib::SimpleActionServer<ac::MoveArmAction> action_server_;
 
-    std::queue<ac::RobotPose> way_points_;
+    std::queue<melfa::RobotPose> way_points_;
 
   public:
     ArmControlNode() : nh_private_("~"), action_server_(nh_, "arm_control_action_server", false)
@@ -46,16 +46,16 @@ class ArmControlNode
 
         try
         {
-            ac::Melfa::ConfigParams params;
+            melfa::Melfa::ConfigParams params;
             params.device = device;
             melfa_.setParams(params);
             melfa_.connect();
         }
-        catch (ac::MelfaSerialConnectionError& err)
+        catch (melfa::MelfaSerialConnectionError& err)
         {
             ROS_ERROR("Serial Connection error: %s", err.what());
         }
-        catch (ac::MelfaRobotError& err)
+        catch (melfa::MelfaRobotError& err)
         {
             ROS_ERROR("Robot error: %s", err.what());
         }
@@ -74,7 +74,7 @@ class ArmControlNode
             // set parameters
             melfa_.setMaximumVelocity(goal->maximum_velocity);
             melfa_.setAcceleration(goal->acceleration);
-            ac::RobotPose tool_pose;
+            melfa::RobotPose tool_pose;
             poseMsgToRobot(goal->tool_pose, tool_pose);
             melfa_.setToolPose(tool_pose);
             while (way_points_.size() > 0 && ros::ok())
@@ -93,7 +93,7 @@ class ArmControlNode
                         melfa_.stop();
                         break;
                     }
-                    ac::RobotPose& next_target_pose = way_points_.front();
+                    melfa::RobotPose& next_target_pose = way_points_.front();
                     melfa_.moveTo(next_target_pose);
                     way_points_.pop();
                     ROS_INFO("Sent next way point to robot: %f %f %f, %f %f %f",
@@ -104,7 +104,7 @@ class ArmControlNode
                             next_target_pose.pitch,
                             next_target_pose.yaw);
                 }
-                catch (const ac::MelfaRobotBusyException&)
+                catch (const melfa::MelfaRobotBusyException&)
                 {
                     // move command failed because robot is busy, wait a little
                     ROS_INFO("Robot is busy, waiting 1 second to send next waypoint.");
@@ -112,7 +112,7 @@ class ArmControlNode
                 }
             }
         }
-        catch (const ac::MelfaException& e)
+        catch (const melfa::MelfaException& e)
         {
             ROS_ERROR("Exception occured when moving robot: %s", e.what());
             action_server_.setAborted();
@@ -123,20 +123,20 @@ class ArmControlNode
         action_server_.setSucceeded(result);
     }
 
-    std::queue<ac::RobotPose> readWayPoints(const geometry_msgs::PoseArray& pose_array) const
+    std::queue<melfa::RobotPose> readWayPoints(const geometry_msgs::PoseArray& pose_array) const
     {
-        std::queue<ac::RobotPose> way_points;
+        std::queue<melfa::RobotPose> way_points;
         for (size_t i = 0; i < pose_array.poses.size(); ++i)
         {
             const geometry_msgs::Pose& pose = pose_array.poses[i];
-            ac::RobotPose way_point;
+            melfa::RobotPose way_point;
             poseMsgToRobot(pose, way_point);
             way_points.push(way_point);
         }
         return way_points;
     }
 
-    void poseMsgToRobot(const geometry_msgs::Pose& pose_msg, ac::RobotPose& robot_pose) const
+    void poseMsgToRobot(const geometry_msgs::Pose& pose_msg, melfa::RobotPose& robot_pose) const
     {
         robot_pose.x = pose_msg.position.x;
         robot_pose.y = pose_msg.position.y;
@@ -149,7 +149,7 @@ class ArmControlNode
     /// reads the pose from the robot and fills the given tf struct
     tf::Pose retrievePose()
     {
-        ac::RobotPose robot_pose = melfa_.getPose();
+        melfa::RobotPose robot_pose = melfa_.getPose();
         tf::Quaternion quat;
         quat.setRPY(robot_pose.roll, robot_pose.pitch, robot_pose.yaw);
         tf::Pose tf_pose(quat, tf::Vector3(robot_pose.x, robot_pose.y, robot_pose.z));
@@ -180,7 +180,7 @@ class ArmControlNode
                         tf::Transform(pose),
                         timestamp, "base_link", "camera"));
         }
-        catch (const ac::MelfaException& e)
+        catch (const melfa::MelfaException& e)
         {
             ROS_ERROR("Exception occured when trying to retrieve robot pose: %s", e.what());
             action_server_.setAborted();

@@ -1,6 +1,6 @@
 #include <stdexcept>
 
-namespace arm_control
+namespace melfa
 {
 
 /// \brief base exception

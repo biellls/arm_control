@@ -1,7 +1,7 @@
 #ifndef ROBOT_POSE_H_
 #define ROBOT_POSE_H_
 
-namespace arm_control
+namespace melfa
 {
     /**
     * \brief struct to hold a robot pose

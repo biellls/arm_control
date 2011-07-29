@@ -2,11 +2,9 @@
 #include <sstream>
 #include <iomanip>
 
-#include "robot_pose.h"
-#include "exceptions.h"
-#include "melfa.h"
-
-namespace ac = arm_control;
+#include "melfa/robot_pose.h"
+#include "melfa/exceptions.h"
+#include "melfa/melfa.h"
 
 
 // formats the value to have 2 digits after the comma
@@ -17,26 +15,26 @@ std::string format(double val)
     return ss.str();
 }
 
-ac::Melfa::Melfa() : connected_(false)
+melfa::Melfa::Melfa() : connected_(false)
 {
 }
 
-ac::Melfa::Melfa(const ac::Melfa::ConfigParams& params) :
+melfa::Melfa::Melfa(const melfa::Melfa::ConfigParams& params) :
     params_(params), connected_(false)
 {
 }
 
-void ac::Melfa::setParams(const ac::Melfa::ConfigParams& params)
+void melfa::Melfa::setParams(const melfa::Melfa::ConfigParams& params)
 {
     params_ = params;
 }
 
-ac::Melfa::~Melfa()
+melfa::Melfa::~Melfa()
 {
     disconnect();
 }
 
-void ac::Melfa::connect()
+void melfa::Melfa::connect()
 {
     boost::mutex::scoped_lock connection_lock(connection_mutex_);
     int status;
@@ -76,7 +74,7 @@ void ac::Melfa::connect()
     initRobot();
 }
 
-void ac::Melfa::disconnect()
+void melfa::Melfa::disconnect()
 {
     boost::mutex::scoped_lock connection_lock(connection_mutex_);
     if (connected_)
@@ -89,7 +87,7 @@ void ac::Melfa::disconnect()
     }
 }
 
-bool ac::Melfa::isBusy()
+bool melfa::Melfa::isBusy()
 {
     std::vector<std::string> state_msg = sendCommand("1;1;STATE");
     std::string busy_flag = state_msg[state_msg.size() - 1];
@@ -103,14 +101,14 @@ bool ac::Melfa::isBusy()
     }
 }
 
-ac::RobotPose ac::Melfa::getPose()
+melfa::RobotPose melfa::Melfa::getPose()
 {
     std::vector<std::string> pose_msg = sendCommand("1;1;PPOSF");
     if (pose_msg.size() < 12)
     {
         throw MelfaRobotError("Melfa::getPose(): Robot answer too small!");
     }
-    ac::RobotPose pose;
+    melfa::RobotPose pose;
     pose.x = atof(pose_msg[1].c_str()) / 1000;
     pose.y = atof(pose_msg[3].c_str()) / 1000;
     pose.z = atof(pose_msg[5].c_str()) / 1000;
@@ -120,7 +118,7 @@ ac::RobotPose ac::Melfa::getPose()
     return pose;
 }
 
-void ac::Melfa::moveTo(const ac::RobotPose& pose)
+void melfa::Melfa::moveTo(const melfa::RobotPose& pose)
 {
     execute("P1.X=" + format(pose.x * 1000));
     execute("P1.Y=" + format(pose.y * 1000));
@@ -131,26 +129,26 @@ void ac::Melfa::moveTo(const ac::RobotPose& pose)
     execute("MVS P1");
 }
 
-void ac::Melfa::stop()
+void melfa::Melfa::stop()
 {
     sendCommand("STOP");
 }
 
-void ac::Melfa::setMaximumVelocity(double velocity)
+void melfa::Melfa::setMaximumVelocity(double velocity)
 {
     std::ostringstream command;
     command << "SPD " << format(velocity * 1000);
     execute(command.str());
 }
 
-void ac::Melfa::setAcceleration(double percentage)
+void melfa::Melfa::setAcceleration(double percentage)
 {
     std::ostringstream command;
     command << "ACCEL " << percentage;
     execute(command.str());
 }
 
-void ac::Melfa::setToolPose(const ac::RobotPose& pose)
+void melfa::Melfa::setToolPose(const melfa::RobotPose& pose)
 {
     std::ostringstream command;
     command << "TOOL (" 
@@ -163,12 +161,12 @@ void ac::Melfa::setToolPose(const ac::RobotPose& pose)
     execute(command.str());
 }
 
-void ac::Melfa::execute(const std::string& command)
+void melfa::Melfa::execute(const std::string& command)
 {
     sendCommand("1;1;EXEC" + command);
 }
 
-std::vector<std::string> ac::Melfa::sendCommand(const std::string& command)
+std::vector<std::string> melfa::Melfa::sendCommand(const std::string& command)
 {
     boost::mutex::scoped_lock lock(comm_mutex_);
     write(command + "\r");
@@ -177,7 +175,7 @@ std::vector<std::string> ac::Melfa::sendCommand(const std::string& command)
     return parseAnswer(answer);
 }
 
-void ac::Melfa::initRobot()
+void melfa::Melfa::initRobot()
 {
     sendCommand("1;1;OPEN=NARCUSR");
     sendCommand("1;1;CNTLON");
@@ -186,13 +184,13 @@ void ac::Melfa::initRobot()
     sendCommand("1;1;OVRD=3");
 }
 
-void ac::Melfa::deInitRobot()
+void melfa::Melfa::deInitRobot()
 {
     sendCommand("1;1;CNTLOFF");
     sendCommand("1;1;CLOSE");
 }
 
-void ac::Melfa::write(const std::string& data)
+void melfa::Melfa::write(const std::string& data)
 {
     if (!connected_)
         throw MelfaSerialConnectionError("Melfa::write(): Robot not connected!");
@@ -206,7 +204,7 @@ void ac::Melfa::write(const std::string& data)
     }
 }
 
-std::string ac::Melfa::read()
+std::string melfa::Melfa::read()
 {
     if (!connected_)
         throw MelfaSerialConnectionError("Melfa::read(): Robot not connected!");
@@ -234,7 +232,7 @@ std::string ac::Melfa::read()
     return answer;
 }
 
-void ac::Melfa::checkAnswer(const std::string& answer)
+void melfa::Melfa::checkAnswer(const std::string& answer)
 {
     if (answer.size() < 4)
         throw MelfaRobotError("Melfa::checkAnswer(): Robot answer too small!");
@@ -265,7 +263,7 @@ void ac::Melfa::checkAnswer(const std::string& answer)
     throw MelfaRobotError(error);
 }
 
-std::vector<std::string> ac::Melfa::parseAnswer(const std::string& answer) const
+std::vector<std::string> melfa::Melfa::parseAnswer(const std::string& answer) const
 {
     std::vector<std::string> elements;
     int start;

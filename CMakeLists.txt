@@ -20,25 +20,27 @@ set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
 #set the default path for built libraries to the "lib" directory
 set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
 
-include_directories(${PROJECT_SOURCE_DIR}/include/${PROJECT_NAME})
+include_directories(${PROJECT_SOURCE_DIR}/include)
 
 #uncomment if you have defined messages
 rosbuild_genmsg()
 #uncomment if you have defined services
 #rosbuild_gensrv()
 
-rosbuild_add_library(${PROJECT_NAME} src/serialcomm.cpp src/melfa.cpp)
+rosbuild_add_library(melfa src/melfa/melfa.cpp)
+rosbuild_add_library(serial src/serial/serialcomm.cpp)
 rosbuild_add_executable(execute src/tools/execute.cpp)
 rosbuild_add_executable(batch_execute src/tools/batch_execute.cpp)
 rosbuild_add_executable(send_raw src/tools/send_raw.cpp)
 rosbuild_add_executable(batch_send_raw src/tools/batch_send_raw.cpp)
 rosbuild_add_executable(arm_control_node src/nodes/arm_control_node.cpp)
 rosbuild_add_executable(follow_path src/nodes/follow_path.cpp)
-target_link_libraries(execute ${PROJECT_NAME})
-target_link_libraries(batch_execute ${PROJECT_NAME})
-target_link_libraries(send_raw ${PROJECT_NAME})
-target_link_libraries(batch_send_raw ${PROJECT_NAME})
-target_link_libraries(arm_control_node ${PROJECT_NAME})
+target_link_libraries(melfa serial)
+target_link_libraries(execute melfa)
+target_link_libraries(batch_execute melfa)
+target_link_libraries(send_raw melfa)
+target_link_libraries(batch_send_raw melfa)
+target_link_libraries(arm_control_node melfa)
 
 #common commands for building c++ executables and libraries
 #target_link_libraries(${PROJECT_NAME} another_library)

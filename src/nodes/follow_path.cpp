@@ -5,11 +5,9 @@
 #include <actionlib/client/terminal_state.h>
 #include <yaml-cpp/yaml.h>
 
-#include "arm_control/robot_pose.h"
+#include "melfa/robot_pose.h"
 
-namespace ac = arm_control;
-
-void operator >> (const YAML::Node& node, ac::RobotPose& pose)
+void operator >> (const YAML::Node& node, melfa::RobotPose& pose)
 {
     node[0] >> pose.x;
     node[1] >> pose.y;
@@ -22,7 +20,7 @@ void operator >> (const YAML::Node& node, ac::RobotPose& pose)
     pose.yaw = pose.yaw / 180.0 * M_PI;
 }
 
-std::ostream& operator<< (std::ostream& ostr, ac::RobotPose& pose)
+std::ostream& operator<< (std::ostream& ostr, melfa::RobotPose& pose)
 {
     ostr << "(" << pose.x << ", " << pose.y << ", " << pose.z << ") "
          << "(" << pose.roll << ", " << pose.pitch << ", " << pose.yaw << ")";
@@ -63,11 +61,11 @@ int main (int argc, char **argv)
         doc["maximum_velocity"] >> maximum_velocity;
         std::cout << "acceleration = " << acceleration << std::endl;
         std::cout << "maximum_velocity = " << maximum_velocity << std::endl;
-        ac::RobotPose tool_pose;
+        melfa::RobotPose tool_pose;
         doc["tool_pose"] >> tool_pose;
         std::cout << "tool_pose = " << tool_pose << std::endl;
         int num_poses = doc["path"].size();
-        std::vector<ac::RobotPose> robot_poses(num_poses);
+        std::vector<melfa::RobotPose> robot_poses(num_poses);
         std::cout << "Reading " << robot_poses.size() << " way points." << std::endl;
         for (size_t i = 0; i < doc["path"].size(); ++i)
         {

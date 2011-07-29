@@ -1,9 +1,9 @@
 #include <fstream>
 #include <iostream>
 
-#include "melfa.h"
-#include "robot_pose.h"
-#include "exceptions.h"
+#include "melfa/melfa.h"
+#include "melfa/robot_pose.h"
+#include "melfa/exceptions.h"
 
 int main(int argc, char* argv[])
 {
@@ -24,10 +24,10 @@ int main(int argc, char* argv[])
         return -3;
     }
  
-    arm_control::Melfa::ConfigParams params;
+    melfa::Melfa::ConfigParams params;
     params.device = std::string(argv[1]);
 
-    arm_control::Melfa melfa(params);
+    melfa::Melfa melfa(params);
     
     try
     {
@@ -42,16 +42,16 @@ int main(int argc, char* argv[])
             }
             std::cout << "executing: " << command << std::endl;
             melfa.execute(command);
-            arm_control::RobotPose pose = melfa.getPose();
+            melfa::RobotPose pose = melfa.getPose();
             std::cout << "current pose: (" << pose.x << ", " << pose.y << ", " << pose.z << ") "
                 "(" << pose.roll << ", " << pose.pitch << ", " << pose.yaw << ")" << std::endl;
         }
     }
-    catch (arm_control::MelfaSerialConnectionError& err)
+    catch (melfa::MelfaSerialConnectionError& err)
     {
         std::cerr << "Serial Connection error: " << err.what() << std::endl;
     }
-    catch (arm_control::MelfaRobotError& err)
+    catch (melfa::MelfaRobotError& err)
     {
         std::cerr << "Robot error: " << err.what() << std::endl;
     }

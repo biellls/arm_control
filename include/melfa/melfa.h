@@ -5,9 +5,9 @@
 #include <vector>
 #include <boost/thread/mutex.hpp>
 
-#include "serialcomm.h"
+#include "serial/serialcomm.h"
 
-namespace arm_control
+namespace melfa
 {
 
 struct RobotPose;
