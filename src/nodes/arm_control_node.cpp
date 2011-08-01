@@ -6,6 +6,8 @@
 #include <actionlib/server/simple_action_server.h>
 #include "arm_control/MoveArmAction.h"
 
+#include "melfa_ros/conversions.h"
+
 #include "melfa/melfa.h"
 #include "melfa/robot_pose.h"
 #include "melfa/exceptions.h"
@@ -75,7 +77,7 @@ class ArmControlNode
             melfa_.setMaximumVelocity(goal->maximum_velocity);
             melfa_.setAcceleration(goal->acceleration);
             melfa::RobotPose tool_pose;
-            poseMsgToRobot(goal->tool_pose, tool_pose);
+            melfa_ros::poseMsgToRobot(goal->tool_pose, tool_pose);
             melfa_.setToolPose(tool_pose);
             while (way_points_.size() > 0 && ros::ok())
             {
@@ -130,20 +132,10 @@ class ArmControlNode
         {
             const geometry_msgs::Pose& pose = pose_array.poses[i];
             melfa::RobotPose way_point;
-            poseMsgToRobot(pose, way_point);
+            melfa_ros::poseMsgToRobot(pose, way_point);
             way_points.push(way_point);
         }
         return way_points;
-    }
-
-    void poseMsgToRobot(const geometry_msgs::Pose& pose_msg, melfa::RobotPose& robot_pose) const
-    {
-        robot_pose.x = pose_msg.position.x;
-        robot_pose.y = pose_msg.position.y;
-        robot_pose.z = pose_msg.position.z;
-        tf::Quaternion quat;
-        tf::quaternionMsgToTF(pose_msg.orientation, quat);
-        btMatrix3x3(quat).getRPY(robot_pose.roll, robot_pose.pitch, robot_pose.yaw);
     }
 
     /// reads the pose from the robot and fills the given tf struct
@@ -163,22 +155,24 @@ class ArmControlNode
         return tf_pose;
     }
 
+
     void reportPose()
     {
         try
         {
             geometry_msgs::PoseStamped pose_stamped;
-            tf::Pose pose = retrievePose();
+            melfa_ros::poseRobotToMsg(melfa_.getPose(), pose_stamped.pose);
             ros::Time timestamp = ros::Time::now();
             pose_stamped.header.stamp = timestamp;
-            pose_stamped.header.frame_id = "base_link";
-            tf::poseTFToMsg(pose, pose_stamped.pose);
+            pose_stamped.header.frame_id = "arm_base";
             pose_pub_.publish(pose_stamped);
 
+            tf::Pose tf_pose;
+            tf::poseMsgToTF(pose_stamped.pose, tf_pose);
             tf_broadcaster_.sendTransform(
                     tf::StampedTransform(
-                        tf::Transform(pose),
-                        timestamp, "base_link", "camera"));
+                        tf::Transform(tf_pose),
+                        timestamp, "arm_base", "arm_tool"));
         }
         catch (const melfa::MelfaException& e)
         {

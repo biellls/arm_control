@@ -5,6 +5,8 @@
 #include <actionlib/client/terminal_state.h>
 #include <yaml-cpp/yaml.h>
 
+#include "arm_control/MoveArmAction.h"
+
 #include "melfa/robot_pose.h"
 
 void operator >> (const YAML::Node& node, melfa::RobotPose& pose)
@@ -15,9 +17,6 @@ void operator >> (const YAML::Node& node, melfa::RobotPose& pose)
     node[3] >> pose.roll;
     node[4] >> pose.pitch;
     node[5] >> pose.yaw;
-    pose.roll = pose.roll / 180.0 * M_PI;
-    pose.pitch = pose.pitch / 180.0 * M_PI;
-    pose.yaw = pose.yaw / 180.0 * M_PI;
 }
 
 std::ostream& operator<< (std::ostream& ostr, melfa::RobotPose& pose)
@@ -72,6 +71,33 @@ int main (int argc, char **argv)
             doc["path"][i] >> robot_poses[i];
             std::cout << i << "\t" << robot_poses[i] << std::endl;
         }
+        // create the action client
+        // true causes the client to spin its own thread
+        actionlib::SimpleActionClient<arm_control::MoveArmAction> ac("follow_path_action_client", true);
+
+        ROS_INFO("Waiting for action server to start.");
+        // wait for the action server to start
+        ac.waitForServer(); //will wait for infinite time
+
+        ROS_INFO("Action server started, sending goal.");
+        // send a goal to the action
+        arm_control::MoveArmGoal goal;
+        goal.acceleration = acceleration;
+        goal.maximum_velocity = maximum_velocity;
+
+        ac.sendGoal(goal);
+
+        //wait for the action to return
+        bool finished_before_timeout = ac.waitForResult(ros::Duration(300.0));
+
+        if (finished_before_timeout)
+        {
+            actionlib::SimpleClientGoalState state = ac.getState();
+            ROS_INFO("Action finished: %s", state.toString().c_str());
+        }
+        else
+            ROS_INFO("Action did not finish before the time out.");
+
     }
     catch (const YAML::Exception& e)
     {
@@ -79,33 +105,6 @@ int main (int argc, char **argv)
         exit(4);
     }
 
-    /*
-    // create the action client
-    // true causes the client to spin its own thread
-    actionlib::SimpleActionClient<ac::MoveArmAction> ac("follow_path_action_client", true);
-
-    ROS_INFO("Waiting for action server to start.");
-    // wait for the action server to start
-    ac.waitForServer(); //will wait for infinite time
-
-    ROS_INFO("Action server started, sending goal.");
-    // send a goal to the action
-    ac::MoveArmGoal goal;
-    ac.sendGoal(goal);
-
-    //wait for the action to return
-    bool finished_before_timeout = ac.waitForResult(ros::Duration(300.0));
-
-    if (finished_before_timeout)
-    {
-        actionlib::SimpleClientGoalState state = ac.getState();
-        ROS_INFO("Action finished: %s", state.toString().c_str());
-    }
-    else
-        ROS_INFO("Action did not finish before the time out.");
-
-    //exit
-    */
     return 0;
 }
 

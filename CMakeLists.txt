@@ -29,6 +29,7 @@ rosbuild_genmsg()
 
 rosbuild_add_library(melfa src/melfa/melfa.cpp)
 rosbuild_add_library(serial src/serial/serialcomm.cpp)
+rosbuild_add_library(melfa_ros src/melfa_ros/conversions.cpp)
 rosbuild_add_executable(execute src/tools/execute.cpp)
 rosbuild_add_executable(batch_execute src/tools/batch_execute.cpp)
 rosbuild_add_executable(send_raw src/tools/send_raw.cpp)
@@ -40,7 +41,11 @@ target_link_libraries(execute melfa)
 target_link_libraries(batch_execute melfa)
 target_link_libraries(send_raw melfa)
 target_link_libraries(batch_send_raw melfa)
-target_link_libraries(arm_control_node melfa)
+target_link_libraries(arm_control_node melfa melfa_ros)
+
+rosbuild_add_gtest(melfa_ros_test test/melfa_ros_test.cpp)
+target_link_libraries(melfa_ros_test melfa_ros)
+
 
 #common commands for building c++ executables and libraries
 #target_link_libraries(${PROJECT_NAME} another_library)
