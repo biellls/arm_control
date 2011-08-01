@@ -1,6 +1,8 @@
+#include <ros/package.h>
+
 #include <gtest/gtest.h>
 #include "melfa_ros/conversions.h"
-#include "melfa/robot_pose.h"
+#include "melfa_ros/robot_path.h"
 
 TEST(MelfaRos, conversions)
 {
@@ -28,8 +30,21 @@ TEST(MelfaRos, conversions)
     EXPECT_NEAR(robot_pose.roll, robot_pose2.roll, 0.00001);
     EXPECT_NEAR(robot_pose.pitch, robot_pose2.pitch, 0.00001);
     EXPECT_NEAR(robot_pose.yaw, robot_pose2.yaw, 0.00001);
+}
 
+TEST(MelfaRos, pathIO)
+{
+    std::string file_name = ros::package::getPath(ROS_PACKAGE_NAME) + "/data/example_path.yaml";
+    melfa_ros::RobotPath robot_path = melfa_ros::readRobotPath(file_name);
 
+    EXPECT_NEAR(robot_path.acceleration, 100, 0.00001);
+    EXPECT_NEAR(robot_path.maximum_velocity, 0.05, 0.00001);
+    EXPECT_NEAR(robot_path.tool_pose.x, 0.05, 0.00001);
+    EXPECT_NEAR(robot_path.tool_pose.y, 0.04, 0.00001);
+    EXPECT_NEAR(robot_path.tool_pose.z, 0.01, 0.00001);
+    EXPECT_NEAR(robot_path.tool_pose.roll, 0.0, 0.00001);
+    EXPECT_NEAR(robot_path.tool_pose.pitch, 0.0, 0.00001);
+    EXPECT_NEAR(robot_path.tool_pose.yaw, 0.0, 0.00001);
 }
 
 // Run all the tests that were declared with TEST()

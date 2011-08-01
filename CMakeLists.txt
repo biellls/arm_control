@@ -29,7 +29,7 @@ rosbuild_genmsg()
 
 rosbuild_add_library(melfa src/melfa/melfa.cpp)
 rosbuild_add_library(serial src/serial/serialcomm.cpp)
-rosbuild_add_library(melfa_ros src/melfa_ros/conversions.cpp)
+rosbuild_add_library(melfa_ros src/melfa_ros/robot_path.cpp src/melfa_ros/conversions.cpp)
 rosbuild_add_executable(execute src/tools/execute.cpp)
 rosbuild_add_executable(batch_execute src/tools/batch_execute.cpp)
 rosbuild_add_executable(send_raw src/tools/send_raw.cpp)
