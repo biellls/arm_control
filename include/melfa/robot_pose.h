@@ -20,5 +20,7 @@ namespace melfa
     };
 }
 
+std::ostream& operator<< (std::ostream& ostr, const melfa::RobotPose& robot_pose);
+
 #endif
 
