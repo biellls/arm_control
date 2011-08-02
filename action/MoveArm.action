@@ -1,9 +1,6 @@
-# goal: Move the tool (e.g. camera) with given speed
-#       parameters along given path
-float32 maximum_velocity # in m/s
-float32 acceleration # percentage of maximum
-geometry_msgs/Pose tool_pose
-geometry_msgs/PoseArray path 
+# goal: Move the tool (e.g. camera)
+#       along given path
+nav_msgs/Path path 
 ---
 # result
 geometry_msgs/Pose end_pose

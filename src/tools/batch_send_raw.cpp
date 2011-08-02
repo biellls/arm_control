@@ -38,11 +38,11 @@ int main(int argc, char* argv[])
             melfa.sendCommand(command);
         }
     }
-    catch (melfa::MelfaSerialConnectionError& err)
+    catch (melfa::SerialConnectionError& err)
     {
         std::cerr << "Serial Connection error: " << err.what() << std::endl;
     }
-    catch (melfa::MelfaRobotError& err)
+    catch (melfa::RobotError& err)
     {
         std::cerr << "Robot error: " << err.what() << std::endl;
     }

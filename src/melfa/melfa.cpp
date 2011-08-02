@@ -41,7 +41,7 @@ void melfa::Melfa::connect()
     {
         boost::mutex::scoped_lock lock(comm_mutex_);
         if (!comm_.openDevice(params_.device, status))
-            throw MelfaSerialConnectionError("Melfa::connect(): could not open device.");
+            throw SerialConnectionError("Melfa::connect(): could not open device.");
 
         std::string error("Melfa::connect():");
         bool ok;
@@ -67,7 +67,7 @@ void melfa::Melfa::connect()
         if (!all_ok)
         {
             comm_.closeDevice(status);
-            throw MelfaSerialConnectionError(error);
+            throw SerialConnectionError(error);
         }
         connected_ = true;
     }
@@ -106,7 +106,7 @@ melfa::RobotPose melfa::Melfa::getPose()
     std::vector<std::string> pose_msg = sendCommand("1;1;PPOSF");
     if (pose_msg.size() < 12)
     {
-        throw MelfaRobotError("Melfa::getPose(): Robot answer too small!");
+        throw RobotError("Melfa::getPose(): Robot answer too small!");
     }
     melfa::RobotPose pose;
     pose.x = atof(pose_msg[1].c_str()) / 1000;
@@ -193,21 +193,21 @@ void melfa::Melfa::deInitRobot()
 void melfa::Melfa::write(const std::string& data)
 {
     if (!connected_)
-        throw MelfaSerialConnectionError("Melfa::write(): Robot not connected!");
+        throw SerialConnectionError("Melfa::write(): Robot not connected!");
     unsigned long num_bytes_written;
     int status;
     bool write_ok = comm_.writeData(data.length(),
             data.c_str(), num_bytes_written, status);
     if (!write_ok || num_bytes_written != data.length())
     {
-        throw MelfaSerialConnectionError("Melfa::send(): error writing to device!");
+        throw SerialConnectionError("Melfa::send(): error writing to device!");
     }
 }
 
 std::string melfa::Melfa::read()
 {
     if (!connected_)
-        throw MelfaSerialConnectionError("Melfa::read(): Robot not connected!");
+        throw SerialConnectionError("Melfa::read(): Robot not connected!");
     int buffer_size = 4096;
     char buffer[buffer_size];
     long unsigned int total_num_bytes_read = 0;
@@ -220,7 +220,7 @@ std::string melfa::Melfa::read()
         bool read_ok = comm_.readData(buffer_size, buffer, num_bytes_read, status);
         if (!read_ok)
         {
-            throw MelfaSerialConnectionError("Melfa::read(): error reading from device!");
+            throw SerialConnectionError("Melfa::read(): error reading from device!");
         }
         std::string buffer_string(buffer, num_bytes_read);
         answer += buffer_string;
@@ -235,9 +235,9 @@ std::string melfa::Melfa::read()
 void melfa::Melfa::checkAnswer(const std::string& answer)
 {
     if (answer.size() < 4)
-        throw MelfaRobotError("Melfa::checkAnswer(): Robot answer too small!");
+        throw RobotError("Melfa::checkAnswer(): Robot answer too small!");
     if (answer[answer.length() - 1] != '\r')
-        throw MelfaRobotError("Melfa::checkAnswer(): no end marker in answer!");
+        throw RobotError("Melfa::checkAnswer(): no end marker in answer!");
 
     if (answer.substr(0, 3) == "QoK")
     {
@@ -257,10 +257,16 @@ void melfa::Melfa::checkAnswer(const std::string& answer)
         error += " " + read().substr(3);
         if (errorno == "5640")
         {
-            throw MelfaRobotBusyException(error);
+            throw RobotBusyException(error);
         }
+        /* TODO: fill in right error number!
+        else if (errorno == "")
+        {
+            throw TargetUnreachableException(error);
+        }
+        */
     }
-    throw MelfaRobotError(error);
+    throw RobotError(error);
 }
 
 std::vector<std::string> melfa::Melfa::parseAnswer(const std::string& answer) const

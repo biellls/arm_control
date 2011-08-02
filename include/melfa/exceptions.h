@@ -10,23 +10,28 @@ class MelfaException : public std::runtime_error
         MelfaException(const std::string& what) : std::runtime_error(what) {}
 };
 
-class MelfaSerialConnectionError : public MelfaException
+class SerialConnectionError : public MelfaException
 {
     public:
-        MelfaSerialConnectionError(const std::string& what) : MelfaException(what) {}
+        SerialConnectionError(const std::string& what) : MelfaException(what) {}
 };
 
-class MelfaRobotError : public MelfaException
+class RobotError : public MelfaException
 {
     public:
-        MelfaRobotError(const std::string& what) : MelfaException(what) {}
+        RobotError(const std::string& what) : MelfaException(what) {}
 };
 
-class MelfaRobotBusyException : public MelfaRobotError
+class RobotBusyException : public RobotError
 {
     public:
-        MelfaRobotBusyException(const std::string& what) : MelfaRobotError(what) {}
+        RobotBusyException(const std::string& what) : RobotError(what) {}
 };
 
+class PoseUnreachableException : public RobotError
+{
+    public:
+        PoseUnreachableException(const std::string& what) : RobotError(what) {}
+};
 
 }
