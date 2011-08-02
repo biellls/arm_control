@@ -7,15 +7,7 @@
 
 namespace melfa_ros
 {
-    struct RobotPath
-    {
-        double acceleration;
-        double maximum_velocity;
-        melfa::RobotPose tool_pose;
-        std::vector<melfa::RobotPose> path_poses;
-    };
-
-    RobotPath readRobotPath(const std::string& file_name);
+    std::vector<melfa::RobotPose> readRobotPath(const std::string& file_name);
 }
 
 #endif

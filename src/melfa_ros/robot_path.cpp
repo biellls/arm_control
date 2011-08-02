@@ -16,13 +16,13 @@ void operator >> (const YAML::Node& node, melfa::RobotPose& pose)
 }
 
 
-melfa_ros::RobotPath melfa_ros::readRobotPath(const std::string& file_name)
+std::vector<melfa::RobotPose> melfa_ros::readRobotPath(const std::string& file_name)
 {
     std::ifstream in(file_name.c_str());
     if (!in.is_open())
     {
         ROS_ERROR_STREAM("Cannot open file " << file_name);
-        return melfa_ros::RobotPath();
+        return std::vector<melfa::RobotPose>();
     }
     try
     {
@@ -30,27 +30,24 @@ melfa_ros::RobotPath melfa_ros::readRobotPath(const std::string& file_name)
         if (!parser)
         {
             ROS_ERROR("Cannot create YAML parser.");
-            return melfa_ros::RobotPath();
+            return std::vector<melfa::RobotPose>();
         }
 
         YAML::Node doc;
         parser.GetNextDocument(doc);
 
-        melfa_ros::RobotPath robot_path;
-        doc["acceleration"] >> robot_path.acceleration;
-        doc["maximum_velocity"] >> robot_path.maximum_velocity;
-        doc["tool_pose"] >> robot_path.tool_pose;
-        robot_path.path_poses.resize(doc["path"].size());
+        std::vector<melfa::RobotPose> robot_path;
+        robot_path.resize(doc["path"].size());
         for (size_t i = 0; i < doc["path"].size(); ++i)
         {
-            doc["path"][i] >> robot_path.path_poses[i];
+            doc["path"][i] >> robot_path[i];
         }
         return robot_path;
     }
     catch (const YAML::Exception& e)
     {
         ROS_ERROR_STREAM("YAML exception: " << e.what());
-        return melfa_ros::RobotPath();
+        return std::vector<melfa::RobotPose>();
     }
 }
 

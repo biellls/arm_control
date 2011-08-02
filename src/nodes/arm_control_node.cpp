@@ -82,15 +82,17 @@ class ArmControlNode
 
         pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("pose", 1);
 
-        timer_ = nh_.createTimer(ros::Duration(0.05), boost::bind(&ArmControlNode::report, this)); 
+        timer_ = nh_.createTimer(ros::Duration(5), boost::bind(&ArmControlNode::report, this)); 
         action_server_.registerGoalCallback(boost::bind(&ArmControlNode::goalCB, this));
         action_server_.start();
+        ROS_INFO("Action server started.");
     }
 
     void goalCB()
     {
         ac::MoveArmGoalConstPtr goal = action_server_.acceptNewGoal();
         way_points_ = readWayPoints(goal->path.poses);
+        ROS_INFO("Received new goal: path with %zu waypoints.", way_points_.size());
         try
         {
             while (way_points_.size() > 0 && ros::ok())

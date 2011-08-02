@@ -9,6 +9,7 @@
 
 #include "melfa/robot_pose.h"
 #include "melfa_ros/robot_path.h"
+#include "melfa_ros/conversions.h"
 
 int main (int argc, char **argv)
 {
@@ -19,32 +20,35 @@ int main (int argc, char **argv)
         exit(1);
     }
 
-    melfa_ros::RobotPath robot_path = melfa_ros::readRobotPath(argv[1]);
+    std::vector<melfa::RobotPose> robot_path = melfa_ros::readRobotPath(argv[1]);
 
-    /*
     // insert data from RobotPath struct
-    melfa_ros::poseRobotToMsg(robot_path.tool_pose, goal.tool_pose);
-    goal.path.resize(robot_path.path_poses.size());
-    for (size_t i = 0; i < robot_path.path_poses.size(); ++i)
+    arm_control::MoveArmGoal goal;
+    goal.path.poses.resize(robot_path.size());
+    for (size_t i = 0; i < robot_path.size(); ++i)
     {
-        melfa_ros::poseRobotToMsg(robot_path.path_poses[i], goal.path[i]);
+        melfa_ros::poseRobotToMsg(robot_path[i], goal.path.poses[i].pose);
     }
 
-    ac.sendGoal(goal);
+    actionlib::SimpleActionClient<arm_control::MoveArmAction> action_client("robot_arm/arm_control_action_server");
+    ROS_INFO("Waiting for move arm action server...");
+    action_client.waitForServer();
+
+    ROS_INFO("Server started, sending goal.");
+    action_client.sendGoal(goal);
 
     //wait for the action to return
-    bool finished_before_timeout = ac.waitForResult(ros::Duration(300.0));
+    bool finished_before_timeout = action_client.waitForResult(ros::Duration(300.0));
 
     if (finished_before_timeout)
     {
-        actionlib::SimpleClientGoalState state = ac.getState();
+        actionlib::SimpleClientGoalState state = action_client.getState();
         ROS_INFO("Action finished: %s", state.toString().c_str());
     }
     else
     {
         ROS_INFO("Action did not finish before the time out.");
     }
-    */
 
     return 0;
 }
