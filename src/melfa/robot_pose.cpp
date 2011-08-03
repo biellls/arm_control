@@ -12,7 +12,13 @@ std::ostream& operator<< (std::ostream& ostr, const melfa::RobotPose& robot_pose
          << robot_pose.roll << ", "
          << robot_pose.pitch << ", "
          << robot_pose.yaw
-         << ")";
+         << ") ("
+         << robot_pose.j1 << ", "
+         << robot_pose.j2 << ", "
+         << robot_pose.j3 << ", "
+         << robot_pose.j4 << ", "
+         << robot_pose.j5 << ", "
+         << robot_pose.j6 << ")";
     return ostr;
 }
 

@@ -115,11 +115,28 @@ melfa::RobotPose melfa::Melfa::getPose()
     pose.roll = atof(pose_msg[7].c_str()) / 180 * M_PI;
     pose.pitch = atof(pose_msg[9].c_str()) / 180 * M_PI;
     pose.yaw = atof(pose_msg[11].c_str()) / 180 * M_PI;
+    std::vector<std::string> joint_msg = sendCommand("1;1;JPOSF");
+    pose.j1 = atof(joint_msg[1].c_str()) / 180.0 * M_PI;
+    pose.j2 = atof(joint_msg[3].c_str()) / 180.0 * M_PI;
+    pose.j3 = atof(joint_msg[5].c_str()) / 180.0 * M_PI;
+    pose.j4 = atof(joint_msg[7].c_str()) / 180.0 * M_PI;
+    pose.j5 = atof(joint_msg[9].c_str()) / 180.0 * M_PI;
+    pose.j6 = atof(joint_msg[11].c_str()) / 180.0 * M_PI;
     return pose;
 }
 
 void melfa::Melfa::moveTo(const melfa::RobotPose& pose)
 {
+    execute("PCOSIROP=(" 
+            + format(pose.x * 1000) + ","
+            + format(pose.y * 1000) + ","
+            + format(pose.z * 1000) + ","
+            + format(pose.roll / M_PI * 180) + ","
+            + format(pose.pitch / M_PI * 180) + ","
+            + format(pose.yaw / M_PI * 180) + ")");
+    //execute("MOV PCOSIROP"); // joint interpolation
+    execute("MVS PCOSIROP"); // linear interpolation
+    /*
     execute("P1.X=" + format(pose.x * 1000));
     execute("P1.Y=" + format(pose.y * 1000));
     execute("P1.Z=" + format(pose.z * 1000));
@@ -127,6 +144,7 @@ void melfa::Melfa::moveTo(const melfa::RobotPose& pose)
     execute("P1.B=" + format(pose.pitch / M_PI * 180));
     execute("P1.C=" + format(pose.yaw / M_PI * 180));
     execute("MVS P1");
+    */
 }
 
 void melfa::Melfa::stop()
@@ -181,11 +199,13 @@ void melfa::Melfa::initRobot()
     sendCommand("1;1;CNTLON");
     sendCommand("1;1;RSTPRG"); // or SLOTINIT?
     sendCommand("1;1;PRGLOAD=COSIROP");
-    sendCommand("1;1;OVRD=3");
+    sendCommand("1;1;OVRD=50");
+    sendCommand("1;1;SRVON");
 }
 
 void melfa::Melfa::deInitRobot()
 {
+    sendCommand("1;1;SRVOFF");
     sendCommand("1;1;CNTLOFF");
     sendCommand("1;1;CLOSE");
 }
@@ -202,6 +222,7 @@ void melfa::Melfa::write(const std::string& data)
     {
         throw SerialConnectionError("Melfa::send(): error writing to device!");
     }
+    std::cout << "Written: " << data << std::endl;
 }
 
 std::string melfa::Melfa::read()
@@ -229,6 +250,7 @@ std::string melfa::Melfa::read()
         if (answer.length() > 0 && answer[answer.length() - 1] == '\r')
             end_found = true;
     } 
+    std::cout << "read: " << answer << std::endl;
     return answer;
 }
 
@@ -247,6 +269,7 @@ void melfa::Melfa::checkAnswer(const std::string& answer)
     if (answer[2] == 'k' || answer[2] == 'r')
     {
         error += " Robot in error state.";
+        error += " (answer was " + answer + ")";
     }
     if (answer[2] == 'R' || answer[2] == 'r')
     {

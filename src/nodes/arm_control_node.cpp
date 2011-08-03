@@ -1,7 +1,7 @@
 #include <queue>
 
 #include <ros/ros.h>
-#include <std_msgs/Bool.h>
+#include <sensor_msgs/JointState.h>
 #include <tf/transform_broadcaster.h>
 #include <actionlib/server/simple_action_server.h>
 
@@ -21,6 +21,7 @@ class ArmControlNode
     ros::NodeHandle nh_private_;
 
     ros::Publisher pose_pub_;
+    ros::Publisher joint_state_pub_;
 
     tf::TransformBroadcaster tf_broadcaster_;
     melfa::Melfa melfa_;
@@ -51,8 +52,8 @@ class ArmControlNode
         nh_private_.param<double>("maximum_velocity", maximum_velocity, 0.05);
         melfa::RobotPose tool_pose;
         nh_private_.param<double>("tool_pose_x", tool_pose.x, 0.0);
-        nh_private_.param<double>("tool_pose_y", tool_pose.x, 0.0);
-        nh_private_.param<double>("tool_pose_z", tool_pose.x, 0.0);
+        nh_private_.param<double>("tool_pose_y", tool_pose.y, 0.0);
+        nh_private_.param<double>("tool_pose_z", tool_pose.z, 0.0);
         nh_private_.param<double>("tool_pose_roll", tool_pose.roll, 0.0);
         nh_private_.param<double>("tool_pose_pitch", tool_pose.pitch, 0.0);
         nh_private_.param<double>("tool_pose_yaw", tool_pose.yaw, 0.0);
@@ -81,8 +82,9 @@ class ArmControlNode
         }
 
         pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("pose", 1);
+        joint_state_pub_ = nh_.advertise<sensor_msgs::JointState>("joint_state", 1);
 
-        timer_ = nh_.createTimer(ros::Duration(5), boost::bind(&ArmControlNode::report, this)); 
+        timer_ = nh_.createTimer(ros::Duration(0.01), boost::bind(&ArmControlNode::report, this)); 
         action_server_.registerGoalCallback(boost::bind(&ArmControlNode::goalCB, this));
         action_server_.start();
         ROS_INFO("Action server started.");
@@ -169,11 +171,32 @@ class ArmControlNode
         try
         {
             geometry_msgs::PoseStamped pose_stamped;
-            melfa_ros::poseRobotToMsg(melfa_.getPose(), pose_stamped.pose);
+            melfa::RobotPose robot_pose = melfa_.getPose();
+            melfa_ros::poseRobotToMsg(robot_pose, pose_stamped.pose);
             ros::Time timestamp = ros::Time::now();
             pose_stamped.header.stamp = timestamp;
             pose_stamped.header.frame_id = "arm_base";
             pose_pub_.publish(pose_stamped);
+
+            sensor_msgs::JointState joint_state;
+            joint_state.header.stamp = timestamp;
+            joint_state.header.frame_id = "arm_base";
+            joint_state.name.resize(6);
+            joint_state.position.resize(6);
+            joint_state.name[0] = "J1";
+            joint_state.name[1] = "J2";
+            joint_state.name[2] = "J3";
+            joint_state.name[3] = "J4";
+            joint_state.name[4] = "J5";
+            joint_state.name[5] = "J6";
+            joint_state.position[0] = robot_pose.j1;
+            joint_state.position[1] = robot_pose.j2;
+            joint_state.position[2] = robot_pose.j3;
+            joint_state.position[3] = robot_pose.j4;
+            joint_state.position[4] = robot_pose.j5;
+            joint_state.position[5] = robot_pose.j6;
+
+            joint_state_pub_.publish(joint_state);
 
             tf::Pose tf_pose;
             tf::poseMsgToTF(pose_stamped.pose, tf_pose);
@@ -194,7 +217,11 @@ int main(int argc, char** argv)
 {
     ros::init(argc, argv, "arm_control");
     ArmControlNode arm_control_node;
-    ros::spin();
+    // use multi threaded spinning to have callbacks
+    // called while action is running
+    ros::MultiThreadedSpinner spinner(2);
+    spinner.spin();
+    //ros::spin();
     return 0;
 }
 

@@ -17,6 +17,12 @@ namespace melfa
         double roll;
         double pitch;
         double yaw;
+        double j1;
+        double j2;
+        double j3;
+        double j4;
+        double j5;
+        double j6;
     };
 }
 
