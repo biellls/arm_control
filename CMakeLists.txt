@@ -27,7 +27,7 @@ rosbuild_genmsg()
 #uncomment if you have defined services
 #rosbuild_gensrv()
 
-rosbuild_add_library(melfa src/melfa/melfa.cpp src/melfa/robot_pose.cpp)
+rosbuild_add_library(melfa src/melfa/melfa.cpp src/melfa/robot_pose.cpp src/melfa/tool_pose.cpp)
 rosbuild_add_library(serial src/serial/serialcomm.cpp)
 rosbuild_add_library(melfa_ros src/melfa_ros/robot_path.cpp src/melfa_ros/conversions.cpp)
 rosbuild_add_executable(execute src/tools/execute.cpp)

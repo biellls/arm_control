@@ -20,14 +20,14 @@ int main (int argc, char **argv)
         exit(1);
     }
 
-    std::vector<melfa::RobotPose> robot_path = melfa_ros::readRobotPath(argv[1]);
+    std::vector<melfa::ToolPose> robot_path = melfa_ros::readRobotPath(argv[1]);
 
     // insert data from RobotPath struct
     arm_control::MoveArmGoal goal;
     goal.path.poses.resize(robot_path.size());
     for (size_t i = 0; i < robot_path.size(); ++i)
     {
-        melfa_ros::poseRobotToMsg(robot_path[i], goal.path.poses[i].pose);
+        melfa_ros::poseToolToMsg(robot_path[i], goal.path.poses[i].pose);
     }
 
     actionlib::SimpleActionClient<arm_control::MoveArmAction> action_client("robot_arm/arm_control_action_server");

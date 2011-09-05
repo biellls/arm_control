@@ -5,7 +5,7 @@
 
 namespace melfa
 {
-    struct RobotPose;
+    struct ToolPose;
 }
 
 namespace melfa_ros
@@ -13,12 +13,12 @@ namespace melfa_ros
     /**
     * Converts a pose msg to a robot pose
     */
-    void poseMsgToRobot(const geometry_msgs::Pose& pose_msg, melfa::RobotPose& robot_pose);
+    void poseMsgToTool(const geometry_msgs::Pose& pose_msg, melfa::ToolPose& tool_pose);
 
     /**
     * Converts a robot pose to a pose msg
     */
-    void poseRobotToMsg(const melfa::RobotPose& robot_pose, geometry_msgs::Pose& pose_msg);
+    void poseToolToMsg(const melfa::ToolPose& robot_pose, geometry_msgs::Pose& pose_msg);
 }
 
 #endif

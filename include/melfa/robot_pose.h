@@ -5,18 +5,10 @@ namespace melfa
 {
     /**
     * \brief struct to hold a robot pose
-    * The position is given in meters (x, y, z)
-    * and the orientation is given in radiants
-    * (roll, pitch, yaw)
+    * The angles are given in radiants.
     */
     struct RobotPose
     {
-        double x;
-        double y;
-        double z;
-        double roll;
-        double pitch;
-        double yaw;
         double j1;
         double j2;
         double j3;

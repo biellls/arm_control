@@ -43,8 +43,7 @@ int main(int argc, char* argv[])
             std::cout << "executing: " << command << std::endl;
             melfa.execute(command);
             melfa::RobotPose pose = melfa.getPose();
-            std::cout << "current pose: (" << pose.x << ", " << pose.y << ", " << pose.z << ") "
-                "(" << pose.roll << ", " << pose.pitch << ", " << pose.yaw << ")" << std::endl;
+            std::cout << "current pose: " << pose << std::endl;
         }
     }
     catch (melfa::SerialConnectionError& err)

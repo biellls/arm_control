@@ -11,6 +11,7 @@
 
 #include "melfa/melfa.h"
 #include "melfa/robot_pose.h"
+#include "melfa/tool_pose.h"
 #include "melfa/exceptions.h"
 
 namespace ac = arm_control;
@@ -20,7 +21,7 @@ class ArmControlNode
     ros::NodeHandle nh_;
     ros::NodeHandle nh_private_;
 
-    ros::Publisher pose_pub_;
+    ros::Publisher tool_pose_pub_;
     ros::Publisher joint_state_pub_;
 
     tf::TransformBroadcaster tf_broadcaster_;
@@ -29,7 +30,7 @@ class ArmControlNode
 
     actionlib::SimpleActionServer<ac::MoveArmAction> action_server_;
 
-    std::queue<melfa::RobotPose> way_points_;
+    std::queue<melfa::ToolPose> way_points_;
 
   public:
     ArmControlNode() : nh_("robot_arm"), nh_private_("~"), action_server_(nh_, "arm_control_action_server", false)
@@ -50,13 +51,13 @@ class ArmControlNode
         nh_private_.param<double>("acceleration", acceleration, 100);
         double maximum_velocity;
         nh_private_.param<double>("maximum_velocity", maximum_velocity, 0.05);
-        melfa::RobotPose tool_pose;
-        nh_private_.param<double>("tool_pose_x", tool_pose.x, 0.0);
-        nh_private_.param<double>("tool_pose_y", tool_pose.y, 0.0);
-        nh_private_.param<double>("tool_pose_z", tool_pose.z, 0.0);
-        nh_private_.param<double>("tool_pose_roll", tool_pose.roll, 0.0);
-        nh_private_.param<double>("tool_pose_pitch", tool_pose.pitch, 0.0);
-        nh_private_.param<double>("tool_pose_yaw", tool_pose.yaw, 0.0);
+        double tool_x, tool_y, tool_z, tool_roll, tool_pitch, tool_yaw;
+        nh_private_.param<double>("tool_x", tool_x, 0.0);
+        nh_private_.param<double>("tool_y", tool_y, 0.0);
+        nh_private_.param<double>("tool_z", tool_z, 0.0);
+        nh_private_.param<double>("tool_roll", tool_roll, 0.0);
+        nh_private_.param<double>("tool_pitch", tool_pitch, 0.0);
+        nh_private_.param<double>("tool_yaw", tool_yaw, 0.0);
 
         try
         {
@@ -69,8 +70,9 @@ class ArmControlNode
             ROS_INFO("Acceleration set to %f", acceleration);
             melfa_.setMaximumVelocity(maximum_velocity);
             ROS_INFO("Maximum velocity set to %f", maximum_velocity);
-            melfa_.setToolPose(tool_pose);
-            ROS_INFO_STREAM("Tool pose set to " << tool_pose);
+            melfa_.setTool(tool_x, tool_y, tool_z, tool_roll, tool_pitch, tool_yaw);
+            ROS_INFO("Tool set to (%f, %f, %f) (%f, %f, %f)", 
+                    tool_x, tool_y, tool_z, tool_roll, tool_pitch, tool_yaw);
         }
         catch (melfa::SerialConnectionError& err)
         {
@@ -81,7 +83,7 @@ class ArmControlNode
             ROS_ERROR("Robot error: %s", err.what());
         }
 
-        pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("pose", 1);
+        tool_pose_pub_ = nh_.advertise<geometry_msgs::PoseStamped>("tool_pose", 1);
         joint_state_pub_ = nh_.advertise<sensor_msgs::JointState>("joint_state", 1);
 
         timer_ = nh_.createTimer(ros::Duration(0.01), boost::bind(&ArmControlNode::report, this)); 
@@ -103,7 +105,7 @@ class ArmControlNode
                 {
                     // get current pose as feedback
                     ac::MoveArmFeedback feedback;
-                    melfa_ros::poseRobotToMsg(melfa_.getPose(), feedback.current_pose);
+                    melfa_ros::poseToolToMsg(melfa_.getToolPose(), feedback.current_pose);
                     action_server_.publishFeedback(feedback);
 
                     if (action_server_.isPreemptRequested())
@@ -113,7 +115,7 @@ class ArmControlNode
                         melfa_.stop();
                         break;
                     }
-                    melfa::RobotPose& next_target_pose = way_points_.front();
+                    melfa::ToolPose& next_target_pose = way_points_.front();
                     melfa_.moveTo(next_target_pose);
                     way_points_.pop();
                     ROS_INFO("Sent next way point to robot: %f %f %f, %f %f %f",
@@ -138,7 +140,7 @@ class ArmControlNode
 
             // motion is finished
             ac::MoveArmResult result;
-            melfa_ros::poseRobotToMsg(melfa_.getPose(), result.end_pose);
+            melfa_ros::poseToolToMsg(melfa_.getToolPose(), result.end_pose);
             action_server_.setSucceeded(result);
         }
         catch (const melfa::PoseUnreachableException&)
@@ -153,14 +155,14 @@ class ArmControlNode
         }
     }
 
-    std::queue<melfa::RobotPose> readWayPoints(const std::vector<geometry_msgs::PoseStamped>& poses) const
+    std::queue<melfa::ToolPose> readWayPoints(const std::vector<geometry_msgs::PoseStamped>& poses) const
     {
-        std::queue<melfa::RobotPose> way_points;
+        std::queue<melfa::ToolPose> way_points;
         for (size_t i = 0; i < poses.size(); ++i)
         {
             const geometry_msgs::Pose& pose = poses[i].pose;
-            melfa::RobotPose way_point;
-            melfa_ros::poseMsgToRobot(pose, way_point);
+            melfa::ToolPose way_point;
+            melfa_ros::poseMsgToTool(pose, way_point);
             way_points.push(way_point);
         }
         return way_points;
@@ -171,13 +173,14 @@ class ArmControlNode
         try
         {
             geometry_msgs::PoseStamped pose_stamped;
-            melfa::RobotPose robot_pose = melfa_.getPose();
-            melfa_ros::poseRobotToMsg(robot_pose, pose_stamped.pose);
+            melfa::ToolPose tool_pose = melfa_.getToolPose();
+            melfa_ros::poseToolToMsg(tool_pose, pose_stamped.pose);
             ros::Time timestamp = ros::Time::now();
             pose_stamped.header.stamp = timestamp;
             pose_stamped.header.frame_id = "arm_base";
-            pose_pub_.publish(pose_stamped);
+            tool_pose_pub_.publish(pose_stamped);
 
+            melfa::RobotPose robot_pose = melfa_.getPose();
             sensor_msgs::JointState joint_state;
             joint_state.header.stamp = timestamp;
             joint_state.header.frame_id = "arm_base";
