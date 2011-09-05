@@ -141,34 +141,19 @@ void melfa::Melfa::moveTo(const melfa::ToolPose& pose)
             + format(pose.roll / M_PI * 180) + ","
             + format(pose.pitch / M_PI * 180) + ","
             + format(pose.yaw / M_PI * 180) + ")");
-    //execute("MOV PCOSIROP"); // joint interpolation
-    execute("MVS PCOSIROP"); // linear interpolation
-    /*
-    execute("P1.X=" + format(pose.x * 1000));
-    execute("P1.Y=" + format(pose.y * 1000));
-    execute("P1.Z=" + format(pose.z * 1000));
-    execute("P1.A=" + format(pose.roll / M_PI * 180));
-    execute("P1.B=" + format(pose.pitch / M_PI * 180));
-    execute("P1.C=" + format(pose.yaw / M_PI * 180));
-    execute("MVS P1");
-    */
+    execute("MVS PCOSIROP"); // MVS -> linear interpolation
 }
 
 void melfa::Melfa::moveTo(const melfa::RobotPose& pose)
 {
-    throw RobotError("moveTo(RobotPose&) not implemented");
-    /*
-    execute("DEF JNT J1");
-    execute("J1=J_CURR");
-    execute("PCOSIROP=(" 
-            + format(pose.x * 1000) + ","
-            + format(pose.y * 1000) + ","
-            + format(pose.z * 1000) + ","
-            + format(pose.roll / M_PI * 180) + ","
-            + format(pose.pitch / M_PI * 180) + ","
-            + format(pose.yaw / M_PI * 180) + ")");
-    execute("MOV PCOSIROP"); // joint interpolation
-    */
+    execute("JCOSIROP=(" 
+            + format(pose.j1 / M_PI * 180) + ","
+            + format(pose.j2 / M_PI * 180) + ","
+            + format(pose.j3 / M_PI * 180) + ","
+            + format(pose.j4 / M_PI * 180) + ","
+            + format(pose.j5 / M_PI * 180) + ","
+            + format(pose.j6 / M_PI * 180) + ")");
+    execute("MOV JCOSIROP"); // MOV -> joint interpolation
 }
 
 void melfa::Melfa::stop()
