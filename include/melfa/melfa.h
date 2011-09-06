@@ -10,7 +10,8 @@
 namespace melfa
 {
 
-struct RobotPose;
+struct JointState;
+struct ToolPose;
 
 /**
 * \class Melfa
@@ -68,15 +69,26 @@ class Melfa
         bool isBusy();
 
         /**
-        * \brief retrieve the current pose
+        * \brief retrieve the current joint state
         */
-        RobotPose getPose();
+        JointState getJointState();
+
+        /**
+        * \brief retrive the current tool pose
+        */
+        ToolPose getToolPose();
 
         /**
         * \brief sends a move command to given pose
+        * Tries to move the tool to the given coordinates.
         * x, y, and z have to be given in meters, roll, pitch, and yaw in radiants
         */
-        void moveTo(const RobotPose& pose);
+        void moveTool(const ToolPose& pose);
+
+        /**
+        * \brief sends a move command to given joint pose
+        */
+        void moveJoints(const JointState& joint_state);
 
         /**
         * \brief sends a stop command to the robot
@@ -94,9 +106,12 @@ class Melfa
         void setAcceleration(double percentage);
 
         /**
-        * \brief sets the tool pose (the point that is moved)
+        * \brief sets the position of the tool in the hand 
+        * (the point that is moved when using moveTo(ToolPose&))
+        * x, y, and z have to be given in meters, roll, pitch, and yaw in radiants
         */
-        void setToolPose(const RobotPose& pose);
+        void setTool(double x, double y, double z, 
+                double roll, double pitch, double yaw);
 
         /**
         * \brief executes the given MELFA BASIC IV command

@@ -1,6 +1,6 @@
 # goal: Move the tool (e.g. camera)
-#       along given path
-nav_msgs/Path path 
+#       to the given pose
+geometry_msgs/Pose target_pose 
 ---
 # result
 geometry_msgs/Pose end_pose

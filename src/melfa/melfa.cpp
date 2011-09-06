@@ -2,7 +2,8 @@
 #include <sstream>
 #include <iomanip>
 
-#include "melfa/robot_pose.h"
+#include "melfa/tool_pose.h"
+#include "melfa/joint_state.h"
 #include "melfa/exceptions.h"
 #include "melfa/melfa.h"
 
@@ -101,31 +102,37 @@ bool melfa::Melfa::isBusy()
     }
 }
 
-melfa::RobotPose melfa::Melfa::getPose()
+melfa::JointState melfa::Melfa::getJointState()
+{
+    std::vector<std::string> joint_msg = sendCommand("1;1;JPOSF");
+    melfa::JointState joint_state;
+    joint_state.j1 = atof(joint_msg[1].c_str()) / 180.0 * M_PI;
+    joint_state.j2 = atof(joint_msg[3].c_str()) / 180.0 * M_PI;
+    joint_state.j3 = atof(joint_msg[5].c_str()) / 180.0 * M_PI;
+    joint_state.j4 = atof(joint_msg[7].c_str()) / 180.0 * M_PI;
+    joint_state.j5 = atof(joint_msg[9].c_str()) / 180.0 * M_PI;
+    joint_state.j6 = atof(joint_msg[11].c_str()) / 180.0 * M_PI;
+    return joint_state;
+}
+
+melfa::ToolPose melfa::Melfa::getToolPose()
 {
     std::vector<std::string> pose_msg = sendCommand("1;1;PPOSF");
     if (pose_msg.size() < 12)
     {
-        throw RobotError("Melfa::getPose(): Robot answer too small!");
+        throw RobotError("Melfa::getToolPose(): Robot answer too small!");
     }
-    melfa::RobotPose pose;
+    melfa::ToolPose pose;
     pose.x = atof(pose_msg[1].c_str()) / 1000;
     pose.y = atof(pose_msg[3].c_str()) / 1000;
     pose.z = atof(pose_msg[5].c_str()) / 1000;
     pose.roll = atof(pose_msg[7].c_str()) / 180 * M_PI;
     pose.pitch = atof(pose_msg[9].c_str()) / 180 * M_PI;
     pose.yaw = atof(pose_msg[11].c_str()) / 180 * M_PI;
-    std::vector<std::string> joint_msg = sendCommand("1;1;JPOSF");
-    pose.j1 = atof(joint_msg[1].c_str()) / 180.0 * M_PI;
-    pose.j2 = atof(joint_msg[3].c_str()) / 180.0 * M_PI;
-    pose.j3 = atof(joint_msg[5].c_str()) / 180.0 * M_PI;
-    pose.j4 = atof(joint_msg[7].c_str()) / 180.0 * M_PI;
-    pose.j5 = atof(joint_msg[9].c_str()) / 180.0 * M_PI;
-    pose.j6 = atof(joint_msg[11].c_str()) / 180.0 * M_PI;
     return pose;
 }
 
-void melfa::Melfa::moveTo(const melfa::RobotPose& pose)
+void melfa::Melfa::moveTool(const melfa::ToolPose& pose)
 {
     execute("PCOSIROP=(" 
             + format(pose.x * 1000) + ","
@@ -134,17 +141,19 @@ void melfa::Melfa::moveTo(const melfa::RobotPose& pose)
             + format(pose.roll / M_PI * 180) + ","
             + format(pose.pitch / M_PI * 180) + ","
             + format(pose.yaw / M_PI * 180) + ")");
-    //execute("MOV PCOSIROP"); // joint interpolation
-    execute("MVS PCOSIROP"); // linear interpolation
-    /*
-    execute("P1.X=" + format(pose.x * 1000));
-    execute("P1.Y=" + format(pose.y * 1000));
-    execute("P1.Z=" + format(pose.z * 1000));
-    execute("P1.A=" + format(pose.roll / M_PI * 180));
-    execute("P1.B=" + format(pose.pitch / M_PI * 180));
-    execute("P1.C=" + format(pose.yaw / M_PI * 180));
-    execute("MVS P1");
-    */
+    execute("MVS PCOSIROP"); // MVS -> linear interpolation
+}
+
+void melfa::Melfa::moveJoints(const melfa::JointState& joint_state)
+{
+    execute("JCOSIROP=(" 
+            + format(joint_state.j1 / M_PI * 180) + ","
+            + format(joint_state.j2 / M_PI * 180) + ","
+            + format(joint_state.j3 / M_PI * 180) + ","
+            + format(joint_state.j4 / M_PI * 180) + ","
+            + format(joint_state.j5 / M_PI * 180) + ","
+            + format(joint_state.j6 / M_PI * 180) + ")");
+    execute("MOV JCOSIROP"); // MOV -> joint interpolation
 }
 
 void melfa::Melfa::stop()
@@ -166,16 +175,17 @@ void melfa::Melfa::setAcceleration(double percentage)
     execute(command.str());
 }
 
-void melfa::Melfa::setToolPose(const melfa::RobotPose& pose)
+void melfa::Melfa::setTool(double x, double y, double z,
+        double roll, double pitch, double yaw)
 {
     std::ostringstream command;
     command << "TOOL (" 
-            << format(pose.x * 1000) << ","
-            << format(pose.y * 1000) << ","
-            << format(pose.z * 1000) << ","
-            << format(pose.roll / M_PI * 180) << ","
-            << format(pose.pitch / M_PI * 180) << ","
-            << format(pose.yaw / M_PI * 180) << ")";
+            << format(x * 1000) << ","
+            << format(y * 1000) << ","
+            << format(z * 1000) << ","
+            << format(roll / M_PI * 180) << ","
+            << format(pitch / M_PI * 180) << ","
+            << format(yaw / M_PI * 180) << ")";
     execute(command.str());
 }
 
@@ -198,7 +208,7 @@ void melfa::Melfa::initRobot()
     sendCommand("1;1;OPEN=NARCUSR");
     sendCommand("1;1;CNTLON");
     sendCommand("1;1;RSTPRG"); // or SLOTINIT?
-    sendCommand("1;1;PRGLOAD=COSIROP");
+    sendCommand("1;1;PRGLOAD=COSIROP"); // we have to load an empty program
     sendCommand("1;1;OVRD=50");
     sendCommand("1;1;SRVON");
 }
@@ -222,7 +232,7 @@ void melfa::Melfa::write(const std::string& data)
     {
         throw SerialConnectionError("Melfa::send(): error writing to device!");
     }
-    std::cout << "Written: " << data << std::endl;
+    std::cout << "written: " << data << std::endl;
 }
 
 std::string melfa::Melfa::read()
@@ -295,11 +305,8 @@ void melfa::Melfa::checkAnswer(const std::string& answer)
 std::vector<std::string> melfa::Melfa::parseAnswer(const std::string& answer) const
 {
     std::vector<std::string> elements;
-    int start;
-    if (answer[3] == ';')
-        start = 4;
-    else
-        start = 3;
+    int start = 3;
+    if (answer[3] == ';') start = 4;
     // -1 here to strip the trailing '\r'
     std::stringstream ss(answer.substr(start, answer.length() - start - 1));
     std::string item;
