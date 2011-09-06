@@ -85,7 +85,7 @@ std::queue<melfa::JointState> melfa_ros::readJointPath(const std::string& file_n
         for (size_t i = 0; i < doc["joint_path"].size(); ++i)
         {
             melfa::JointState joint_state;
-            doc["joint_state"][i] >> joint_state;
+            doc["joint_path"][i] >> joint_state;
             joint_path.push(joint_state);
         }
         return joint_path;

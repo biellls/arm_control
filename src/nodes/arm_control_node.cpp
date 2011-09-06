@@ -91,9 +91,9 @@ class ArmControlNode
         move_tool_action_server_.start();
         ROS_INFO("Move Tool Action server started.");
 
-//        move_joints_action_server_.registerGoalCallback(boost::bind(&ArmControlNode::moveJointsGoalCB, this));
-//        move_joints_action_server_.start();
-//        ROS_INFO("Move Joints Action server started.");
+        move_joints_action_server_.registerGoalCallback(boost::bind(&ArmControlNode::moveJointsGoalCB, this));
+        move_joints_action_server_.start();
+        ROS_INFO("Move Joints Action server started.");
     }
 
     void moveToolGoalCB()
@@ -150,6 +150,62 @@ class ArmControlNode
             move_tool_action_server_.setAborted();
         }
     }
+
+    void moveJointsGoalCB()
+    {
+        if (move_tool_action_server_.isActive())
+        {
+            ROS_ERROR("Cannot move joints, move tool action is active!");
+            move_tool_action_server_.setAborted();
+            return;
+        }
+        ac::MoveJointsGoalConstPtr goal = move_joints_action_server_.acceptNewGoal();
+        melfa::JointState target_joint_state;
+        melfa_ros::jointStateMsgToJointState(goal->target_joint_state, target_joint_state);
+        ROS_INFO_STREAM("Received new goal: joint state " << target_joint_state);
+        try
+        {
+            melfa_.moveJoints(target_joint_state);
+            while (melfa_.isBusy())
+            {
+                sleep(1);
+                // get current pose as feedback
+                ac::MoveJointsFeedback feedback;
+                melfa_ros::jointStateToJointStateMsg(melfa_.getJointState(), feedback.current_joint_state);
+                move_joints_action_server_.publishFeedback(feedback);
+
+                if (move_joints_action_server_.isPreemptRequested())
+                {
+                    ROS_INFO("MoveJointsAction preempted.");
+                    move_joints_action_server_.setPreempted();
+                    melfa_.stop();
+                    break;
+                }
+
+                if (!ros::ok()) // node shutdown requested?
+                {
+                    melfa_.stop();
+                    break;
+                }
+            }
+
+            // motion is finished
+            ac::MoveJointsResult result;
+            melfa_ros::jointStateToJointStateMsg(melfa_.getJointState(), result.end_joint_state);
+            move_joints_action_server_.setSucceeded(result);
+        }
+        catch (const melfa::PoseUnreachableException&)
+        {
+            ROS_ERROR("Requested pose is unreachable, aborting.");
+            move_joints_action_server_.setAborted();
+        }
+        catch (const melfa::MelfaException& e)
+        {
+            ROS_ERROR("Exception occured when moving robot: %s", e.what());
+            move_joints_action_server_.setAborted();
+        }
+    }
+
 
     void report()
     {
