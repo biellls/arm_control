@@ -305,11 +305,8 @@ void melfa::Melfa::checkAnswer(const std::string& answer)
 std::vector<std::string> melfa::Melfa::parseAnswer(const std::string& answer) const
 {
     std::vector<std::string> elements;
-    int start;
-    if (answer[3] == ';')
-        start = 4;
-    else
-        start = 3;
+    int start = 3;
+    if (answer[3] == ';') start = 4;
     // -1 here to strip the trailing '\r'
     std::stringstream ss(answer.substr(start, answer.length() - start - 1));
     std::string item;
