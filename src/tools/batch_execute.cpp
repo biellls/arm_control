@@ -2,7 +2,8 @@
 #include <iostream>
 
 #include "melfa/melfa.h"
-#include "melfa/robot_pose.h"
+#include "melfa/tool_pose.h"
+#include "melfa/joint_state.h"
 #include "melfa/exceptions.h"
 
 int main(int argc, char* argv[])
@@ -42,8 +43,10 @@ int main(int argc, char* argv[])
             }
             std::cout << "executing: " << command << std::endl;
             melfa.execute(command);
-            melfa::RobotPose pose = melfa.getPose();
-            std::cout << "current pose: " << pose << std::endl;
+            melfa::ToolPose pose = melfa.getToolPose();
+            melfa::JointState joint_state = melfa.getJointState();
+            std::cout << "current tool pose: " << pose << std::endl;
+            std::cout << "current joint state: " << joint_state << std::endl;
         }
     }
     catch (melfa::SerialConnectionError& err)

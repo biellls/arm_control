@@ -1,16 +1,14 @@
-#include <queue>
-
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <tf/transform_broadcaster.h>
 #include <actionlib/server/simple_action_server.h>
 
 #include "arm_control/MoveToolAction.h"
-
+#include "arm_control/MoveJointsAction.h"
 #include "melfa_ros/conversions.h"
 
 #include "melfa/melfa.h"
-#include "melfa/robot_pose.h"
+#include "melfa/joint_state.h"
 #include "melfa/tool_pose.h"
 #include "melfa/exceptions.h"
 
@@ -28,12 +26,13 @@ class ArmControlNode
     melfa::Melfa melfa_;
     ros::Timer timer_;
 
-    actionlib::SimpleActionServer<ac::MoveToolAction> action_server_;
-
-    std::queue<melfa::ToolPose> way_points_;
+    actionlib::SimpleActionServer<ac::MoveToolAction> move_tool_action_server_;
+    actionlib::SimpleActionServer<ac::MoveJointsAction> move_joints_action_server_;
 
   public:
-    ArmControlNode() : nh_("robot_arm"), nh_private_("~"), action_server_(nh_, "arm_control_action_server", false)
+    ArmControlNode() : nh_("robot_arm"), nh_private_("~"), 
+        move_tool_action_server_(nh_, "move_tool_action_server", false),
+        move_joints_action_server_(nh_, "move_joints_action_server", false)
     {
         init();
     }
@@ -87,85 +86,69 @@ class ArmControlNode
         joint_state_pub_ = nh_.advertise<sensor_msgs::JointState>("joint_state", 1);
 
         timer_ = nh_.createTimer(ros::Duration(0.01), boost::bind(&ArmControlNode::report, this)); 
-        action_server_.registerGoalCallback(boost::bind(&ArmControlNode::goalCB, this));
-        action_server_.start();
-        ROS_INFO("Action server started.");
+
+        move_tool_action_server_.registerGoalCallback(boost::bind(&ArmControlNode::moveToolGoalCB, this));
+        move_tool_action_server_.start();
+        ROS_INFO("Move Tool Action server started.");
+
+//        move_joints_action_server_.registerGoalCallback(boost::bind(&ArmControlNode::moveJointsGoalCB, this));
+//        move_joints_action_server_.start();
+//        ROS_INFO("Move Joints Action server started.");
     }
 
-    void goalCB()
+    void moveToolGoalCB()
     {
-        ac::MoveToolGoalConstPtr goal = action_server_.acceptNewGoal();
-        way_points_ = readWayPoints(goal->path.poses);
-        ROS_INFO("Received new goal: path with %zu waypoints.", way_points_.size());
+        if (move_joints_action_server_.isActive())
+        {
+            ROS_ERROR("Cannot move tool, move joints action is active!");
+            move_tool_action_server_.setAborted();
+            return;
+        }
+        ac::MoveToolGoalConstPtr goal = move_tool_action_server_.acceptNewGoal();
+        melfa::ToolPose target_tool_pose;
+        melfa_ros::poseMsgToToolPose(goal->target_pose, target_tool_pose);
+        ROS_INFO_STREAM("Received new goal: tool pose " << target_tool_pose);
         try
         {
-            while (way_points_.size() > 0 && ros::ok())
+            melfa_.moveTool(target_tool_pose);
+            while (melfa_.isBusy())
             {
-                try
-                {
-                    // get current pose as feedback
-                    ac::MoveToolFeedback feedback;
-                    melfa_ros::poseToolToMsg(melfa_.getToolPose(), feedback.current_pose);
-                    action_server_.publishFeedback(feedback);
+                sleep(1);
+                // get current pose as feedback
+                ac::MoveToolFeedback feedback;
+                melfa_ros::toolPoseToPoseMsg(melfa_.getToolPose(), feedback.current_pose);
+                move_tool_action_server_.publishFeedback(feedback);
 
-                    if (action_server_.isPreemptRequested())
-                    {
-                        ROS_INFO("MoveToolAction preempted.");
-                        action_server_.setPreempted();
-                        melfa_.stop();
-                        break;
-                    }
-                    melfa::ToolPose& next_target_pose = way_points_.front();
-                    melfa_.moveTo(next_target_pose);
-                    way_points_.pop();
-                    ROS_INFO("Sent next way point to robot: %f %f %f, %f %f %f",
-                            next_target_pose.x,
-                            next_target_pose.y,
-                            next_target_pose.z,
-                            next_target_pose.roll,
-                            next_target_pose.pitch,
-                            next_target_pose.yaw);
-                }
-                catch (const melfa::RobotBusyException&)
+                if (move_tool_action_server_.isPreemptRequested())
                 {
-                    // move command failed because robot is busy, wait a little
-                    ROS_INFO("Robot is busy, waiting 1 second to send next waypoint.");
-                    sleep(1);
+                    ROS_INFO("MoveToolAction preempted.");
+                    move_tool_action_server_.setPreempted();
+                    melfa_.stop();
+                    break;
+                }
+
+                if (!ros::ok()) // node shutdown requested?
+                {
+                    melfa_.stop();
+                    break;
                 }
             }
-            // all waypoints have been sent, wait for robot to finish
-            ROS_INFO("Last waypoint sent, waiting for robot to finish");
-            while (melfa_.isBusy() && ros::ok())
-                sleep(1);
 
             // motion is finished
             ac::MoveToolResult result;
-            melfa_ros::poseToolToMsg(melfa_.getToolPose(), result.end_pose);
-            action_server_.setSucceeded(result);
+            melfa_ros::toolPoseToPoseMsg(melfa_.getToolPose(), result.end_pose);
+            move_tool_action_server_.setSucceeded(result);
         }
         catch (const melfa::PoseUnreachableException&)
         {
             ROS_ERROR("Requested pose is unreachable, aborting.");
-            action_server_.setAborted();
+            move_tool_action_server_.setAborted();
         }
         catch (const melfa::MelfaException& e)
         {
             ROS_ERROR("Exception occured when moving robot: %s", e.what());
-            action_server_.setAborted();
+            move_tool_action_server_.setAborted();
         }
-    }
-
-    std::queue<melfa::ToolPose> readWayPoints(const std::vector<geometry_msgs::PoseStamped>& poses) const
-    {
-        std::queue<melfa::ToolPose> way_points;
-        for (size_t i = 0; i < poses.size(); ++i)
-        {
-            const geometry_msgs::Pose& pose = poses[i].pose;
-            melfa::ToolPose way_point;
-            melfa_ros::poseMsgToTool(pose, way_point);
-            way_points.push(way_point);
-        }
-        return way_points;
     }
 
     void report()
@@ -174,32 +157,18 @@ class ArmControlNode
         {
             geometry_msgs::PoseStamped pose_stamped;
             melfa::ToolPose tool_pose = melfa_.getToolPose();
-            melfa_ros::poseToolToMsg(tool_pose, pose_stamped.pose);
+            melfa_ros::toolPoseToPoseMsg(tool_pose, pose_stamped.pose);
             ros::Time timestamp = ros::Time::now();
             pose_stamped.header.stamp = timestamp;
             pose_stamped.header.frame_id = "arm_base";
             tool_pose_pub_.publish(pose_stamped);
 
-            melfa::RobotPose robot_pose = melfa_.getPose();
-            sensor_msgs::JointState joint_state;
-            joint_state.header.stamp = timestamp;
-            joint_state.header.frame_id = "arm_base";
-            joint_state.name.resize(6);
-            joint_state.position.resize(6);
-            joint_state.name[0] = "J1";
-            joint_state.name[1] = "J2";
-            joint_state.name[2] = "J3";
-            joint_state.name[3] = "J4";
-            joint_state.name[4] = "J5";
-            joint_state.name[5] = "J6";
-            joint_state.position[0] = robot_pose.j1;
-            joint_state.position[1] = robot_pose.j2;
-            joint_state.position[2] = robot_pose.j3;
-            joint_state.position[3] = robot_pose.j4;
-            joint_state.position[4] = robot_pose.j5;
-            joint_state.position[5] = robot_pose.j6;
-
-            joint_state_pub_.publish(joint_state);
+            sensor_msgs::JointState joint_state_msg;
+            melfa::JointState joint_state = melfa_.getJointState();
+            melfa_ros::jointStateToJointStateMsg(joint_state, joint_state_msg);
+            joint_state_msg.header.stamp = timestamp;
+            joint_state_msg.header.frame_id = "arm_base";
+            joint_state_pub_.publish(joint_state_msg);
 
             tf::Pose tf_pose;
             tf::poseMsgToTF(pose_stamped.pose, tf_pose);

@@ -1,0 +1,9 @@
+# goal: Move the joints to given state
+sensor_msgs/JointState target_joint_state 
+---
+# result
+sensor_msgs/JointState end_joint_state 
+---
+# feedback
+sensor_msgs/JointState current_joint_state 
+

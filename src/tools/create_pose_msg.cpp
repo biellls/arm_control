@@ -22,7 +22,7 @@ int main(int argc, char* argv[])
     pose.yaw = atof(argv[6]) / 180.0 * M_PI;
 
     geometry_msgs::Pose pose_msg;
-    melfa_ros::poseToolToMsg(pose, pose_msg);
+    melfa_ros::toolPoseToPoseMsg(pose, pose_msg);
     std::cout << pose_msg;
 
     return 0;

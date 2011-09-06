@@ -2,8 +2,8 @@
 #include <sstream>
 #include <iomanip>
 
-#include "melfa/robot_pose.h"
 #include "melfa/tool_pose.h"
+#include "melfa/joint_state.h"
 #include "melfa/exceptions.h"
 #include "melfa/melfa.h"
 
@@ -102,17 +102,17 @@ bool melfa::Melfa::isBusy()
     }
 }
 
-melfa::RobotPose melfa::Melfa::getPose()
+melfa::JointState melfa::Melfa::getJointState()
 {
     std::vector<std::string> joint_msg = sendCommand("1;1;JPOSF");
-    melfa::RobotPose pose;
-    pose.j1 = atof(joint_msg[1].c_str()) / 180.0 * M_PI;
-    pose.j2 = atof(joint_msg[3].c_str()) / 180.0 * M_PI;
-    pose.j3 = atof(joint_msg[5].c_str()) / 180.0 * M_PI;
-    pose.j4 = atof(joint_msg[7].c_str()) / 180.0 * M_PI;
-    pose.j5 = atof(joint_msg[9].c_str()) / 180.0 * M_PI;
-    pose.j6 = atof(joint_msg[11].c_str()) / 180.0 * M_PI;
-    return pose;
+    melfa::JointState joint_state;
+    joint_state.j1 = atof(joint_msg[1].c_str()) / 180.0 * M_PI;
+    joint_state.j2 = atof(joint_msg[3].c_str()) / 180.0 * M_PI;
+    joint_state.j3 = atof(joint_msg[5].c_str()) / 180.0 * M_PI;
+    joint_state.j4 = atof(joint_msg[7].c_str()) / 180.0 * M_PI;
+    joint_state.j5 = atof(joint_msg[9].c_str()) / 180.0 * M_PI;
+    joint_state.j6 = atof(joint_msg[11].c_str()) / 180.0 * M_PI;
+    return joint_state;
 }
 
 melfa::ToolPose melfa::Melfa::getToolPose()
@@ -132,7 +132,7 @@ melfa::ToolPose melfa::Melfa::getToolPose()
     return pose;
 }
 
-void melfa::Melfa::moveTo(const melfa::ToolPose& pose)
+void melfa::Melfa::moveTool(const melfa::ToolPose& pose)
 {
     execute("PCOSIROP=(" 
             + format(pose.x * 1000) + ","
@@ -144,15 +144,15 @@ void melfa::Melfa::moveTo(const melfa::ToolPose& pose)
     execute("MVS PCOSIROP"); // MVS -> linear interpolation
 }
 
-void melfa::Melfa::moveTo(const melfa::RobotPose& pose)
+void melfa::Melfa::moveJoints(const melfa::JointState& joint_state)
 {
     execute("JCOSIROP=(" 
-            + format(pose.j1 / M_PI * 180) + ","
-            + format(pose.j2 / M_PI * 180) + ","
-            + format(pose.j3 / M_PI * 180) + ","
-            + format(pose.j4 / M_PI * 180) + ","
-            + format(pose.j5 / M_PI * 180) + ","
-            + format(pose.j6 / M_PI * 180) + ")");
+            + format(joint_state.j1 / M_PI * 180) + ","
+            + format(joint_state.j2 / M_PI * 180) + ","
+            + format(joint_state.j3 / M_PI * 180) + ","
+            + format(joint_state.j4 / M_PI * 180) + ","
+            + format(joint_state.j5 / M_PI * 180) + ","
+            + format(joint_state.j6 / M_PI * 180) + ")");
     execute("MOV JCOSIROP"); // MOV -> joint interpolation
 }
 
