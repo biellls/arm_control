@@ -5,7 +5,7 @@
 #include <actionlib/client/terminal_state.h>
 #include <yaml-cpp/yaml.h>
 
-#include "arm_control/MoveArmAction.h"
+#include "arm_control/MoveToolAction.h"
 
 #include "melfa/robot_pose.h"
 #include "melfa_ros/robot_path.h"
@@ -23,15 +23,15 @@ int main (int argc, char **argv)
     std::vector<melfa::ToolPose> robot_path = melfa_ros::readRobotPath(argv[1]);
 
     // insert data from RobotPath struct
-    arm_control::MoveArmGoal goal;
+    arm_control::MoveToolGoal goal;
     goal.path.poses.resize(robot_path.size());
     for (size_t i = 0; i < robot_path.size(); ++i)
     {
         melfa_ros::poseToolToMsg(robot_path[i], goal.path.poses[i].pose);
     }
 
-    actionlib::SimpleActionClient<arm_control::MoveArmAction> action_client("robot_arm/arm_control_action_server");
-    ROS_INFO("Waiting for move arm action server...");
+    actionlib::SimpleActionClient<arm_control::MoveToolAction> action_client("robot_arm/arm_control_action_server");
+    ROS_INFO("Waiting for move tool action server...");
     action_client.waitForServer();
 
     ROS_INFO("Server started, sending goal.");

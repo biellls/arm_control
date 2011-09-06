@@ -5,7 +5,7 @@
 #include <tf/transform_broadcaster.h>
 #include <actionlib/server/simple_action_server.h>
 
-#include "arm_control/MoveArmAction.h"
+#include "arm_control/MoveToolAction.h"
 
 #include "melfa_ros/conversions.h"
 
@@ -28,7 +28,7 @@ class ArmControlNode
     melfa::Melfa melfa_;
     ros::Timer timer_;
 
-    actionlib::SimpleActionServer<ac::MoveArmAction> action_server_;
+    actionlib::SimpleActionServer<ac::MoveToolAction> action_server_;
 
     std::queue<melfa::ToolPose> way_points_;
 
@@ -94,7 +94,7 @@ class ArmControlNode
 
     void goalCB()
     {
-        ac::MoveArmGoalConstPtr goal = action_server_.acceptNewGoal();
+        ac::MoveToolGoalConstPtr goal = action_server_.acceptNewGoal();
         way_points_ = readWayPoints(goal->path.poses);
         ROS_INFO("Received new goal: path with %zu waypoints.", way_points_.size());
         try
@@ -104,13 +104,13 @@ class ArmControlNode
                 try
                 {
                     // get current pose as feedback
-                    ac::MoveArmFeedback feedback;
+                    ac::MoveToolFeedback feedback;
                     melfa_ros::poseToolToMsg(melfa_.getToolPose(), feedback.current_pose);
                     action_server_.publishFeedback(feedback);
 
                     if (action_server_.isPreemptRequested())
                     {
-                        ROS_INFO("MoveArmAction preempted.");
+                        ROS_INFO("MoveToolAction preempted.");
                         action_server_.setPreempted();
                         melfa_.stop();
                         break;
@@ -139,7 +139,7 @@ class ArmControlNode
                 sleep(1);
 
             // motion is finished
-            ac::MoveArmResult result;
+            ac::MoveToolResult result;
             melfa_ros::poseToolToMsg(melfa_.getToolPose(), result.end_pose);
             action_server_.setSucceeded(result);
         }

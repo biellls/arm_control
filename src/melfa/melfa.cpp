@@ -232,7 +232,7 @@ void melfa::Melfa::write(const std::string& data)
     {
         throw SerialConnectionError("Melfa::send(): error writing to device!");
     }
-    std::cout << "Written: " << data << std::endl;
+    std::cout << "written: " << data << std::endl;
 }
 
 std::string melfa::Melfa::read()
