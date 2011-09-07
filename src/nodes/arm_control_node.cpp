@@ -46,10 +46,10 @@ class ArmControlNode
         std::string device;
         nh_private_.param<std::string>("device", device, "/dev/ttyUSB0");
         ROS_INFO("using device %s", device.c_str());
-        int linear_override;
-        nh_private_.param<int>("linear_override", linear_override, 50);
-        int joint_override;
-        nh_private_.param<int>("joint_override", joint_override, 50);
+        int override;
+        nh_private_.param<int>("override", override, 50);
+        //int joint_override;
+        //nh_private_.param<int>("joint_override", joint_override, 50);
         double tool_x, tool_y, tool_z, tool_roll, tool_pitch, tool_yaw;
         nh_private_.param<double>("tool_x", tool_x, 0.0);
         nh_private_.param<double>("tool_y", tool_y, 0.0);
@@ -65,10 +65,10 @@ class ArmControlNode
             melfa_.setParams(params);
             melfa_.connect();
             ROS_INFO("Robot connected.");
-            melfa_.setLinearOverride(linear_override);
-            ROS_INFO("Linear override set to %i", linear_override);
-            melfa_.setJointOverride(joint_override);
-            ROS_INFO("Joint override set to %i", joint_override);
+            melfa_.setOverride(override);
+            ROS_INFO("Override set to %i", override);
+            //melfa_.setJointOverride(joint_override);
+            //ROS_INFO("Joint override set to %i", joint_override);
             melfa_.setTool(tool_x, tool_y, tool_z, tool_roll, tool_pitch, tool_yaw);
             ROS_INFO("Tool set to (%f, %f, %f) (%f, %f, %f)", 
                     tool_x, tool_y, tool_z, tool_roll, tool_pitch, tool_yaw);

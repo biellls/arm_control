@@ -106,9 +106,9 @@ class Melfa
         void setAcceleration(double percentage);
 
         /**
-        * \brief sets the linear override. must be between 1 and 100.
+        * \brief sets the general override. must be between 1 and 100.
         */
-        void setLinearOverride(int value);
+        void setOverride(int value);
 
         /**
         * \brief sets the joint override. must be between 1 and 100.

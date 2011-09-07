@@ -186,7 +186,7 @@ void melfa::Melfa::setAcceleration(double percentage)
     execute(command.str());
 }
 
-void melfa::Melfa::setLinearOverride(int value)
+void melfa::Melfa::setOverride(int value)
 {
     assert(value > 0 && value <= 100);
     std::ostringstream command;
