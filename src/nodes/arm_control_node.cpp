@@ -113,7 +113,7 @@ class ArmControlNode
             melfa_.moveTool(target_tool_pose);
             while (melfa_.isBusy())
             {
-                sleep(1);
+                usleep(200000);
                 // get current pose as feedback
                 ac::MoveToolFeedback feedback;
                 melfa_ros::toolPoseToPoseMsg(melfa_.getToolPose(), feedback.current_pose);
@@ -168,7 +168,7 @@ class ArmControlNode
             melfa_.moveJoints(target_joint_state);
             while (melfa_.isBusy())
             {
-                sleep(1);
+                usleep(200000);
                 // get current pose as feedback
                 ac::MoveJointsFeedback feedback;
                 melfa_ros::jointStateToJointStateMsg(melfa_.getJointState(), feedback.current_joint_state);

@@ -69,7 +69,7 @@ int main(int argc, char* argv[])
 
 
     melfa::Melfa::ConfigParams params;
-    params.device = std::string(argv[1]);
+    params.device = device_name;
 
     melfa::Melfa melfa(params);
     try
@@ -119,7 +119,8 @@ int main(int argc, char* argv[])
             tool_pose.pitch = coordinates[4] / 180.0 * M_PI;
             tool_pose.yaw = coordinates[5] / 180.0 * M_PI;
             melfa.moveTool(tool_pose);
-         }
+        }
+        while (melfa.isBusy()) sleep(1);
     }
     catch (melfa::SerialConnectionError& err)
     {

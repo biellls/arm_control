@@ -90,6 +90,7 @@ void melfa::Melfa::disconnect()
 
 bool melfa::Melfa::isBusy()
 {
+    /*
     std::vector<std::string> state_msg = sendCommand("1;1;STATE");
     std::string busy_flag = state_msg[state_msg.size() - 1];
     if (busy_flag == "1")
@@ -100,6 +101,16 @@ bool melfa::Melfa::isBusy()
     {
         return false;
     }
+    */
+    try 
+    {
+        execute("REM Waiting...");
+    }
+    catch (RobotBusyException&)
+    {
+        return true;
+    }
+    return false;
 }
 
 melfa::JointState melfa::Melfa::getJointState()
@@ -209,13 +220,15 @@ void melfa::Melfa::initRobot()
     sendCommand("1;1;CNTLON");
     sendCommand("1;1;RSTPRG"); // or SLOTINIT?
     sendCommand("1;1;PRGLOAD=COSIROP"); // we have to load an empty program
-    sendCommand("1;1;OVRD=50");
+    sendCommand("1;1;OVRD=20");
     sendCommand("1;1;SRVON");
+    sleep(2); // wait for servo on
 }
 
 void melfa::Melfa::deInitRobot()
 {
     sendCommand("1;1;SRVOFF");
+    sleep(1); // wait for servo off
     sendCommand("1;1;CNTLOFF");
     sendCommand("1;1;CLOSE");
 }
