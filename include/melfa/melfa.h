@@ -106,6 +106,16 @@ class Melfa
         void setAcceleration(double percentage);
 
         /**
+        * \brief sets the linear override. must be between 1 and 100.
+        */
+        void setLinearOverride(int value);
+
+        /**
+        * \brief sets the joint override. must be between 1 and 100.
+        */
+        void setJointOverride(int value);
+
+        /**
         * \brief sets the position of the tool in the hand 
         * (the point that is moved when using moveTo(ToolPose&))
         * x, y, and z have to be given in meters, roll, pitch, and yaw in radiants

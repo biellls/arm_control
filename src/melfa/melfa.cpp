@@ -186,6 +186,22 @@ void melfa::Melfa::setAcceleration(double percentage)
     execute(command.str());
 }
 
+void melfa::Melfa::setLinearOverride(int value)
+{
+    assert(value > 0 && value <= 100);
+    std::ostringstream command;
+    command << "OVRD " << value;
+    execute(command.str());
+}
+
+void melfa::Melfa::setJointOverride(int value)
+{
+    assert(value > 0 && value <= 100);
+    std::ostringstream command;
+    command << "JOVRD " << value;
+    execute(command.str());
+}
+
 void melfa::Melfa::setTool(double x, double y, double z,
         double roll, double pitch, double yaw)
 {
@@ -220,7 +236,6 @@ void melfa::Melfa::initRobot()
     sendCommand("1;1;CNTLON");
     sendCommand("1;1;RSTPRG"); // or SLOTINIT?
     sendCommand("1;1;PRGLOAD=COSIROP"); // we have to load an empty program
-    sendCommand("1;1;OVRD=20");
     sendCommand("1;1;SRVON");
     sleep(2); // wait for servo on
 }
