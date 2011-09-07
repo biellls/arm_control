@@ -260,7 +260,9 @@ void melfa::Melfa::write(const std::string& data)
     {
         throw SerialConnectionError("Melfa::send(): error writing to device!");
     }
+#ifdef DEBUG
     std::cout << "written: " << data << std::endl;
+#endif
 }
 
 std::string melfa::Melfa::read()
@@ -288,7 +290,9 @@ std::string melfa::Melfa::read()
         if (answer.length() > 0 && answer[answer.length() - 1] == '\r')
             end_found = true;
     } 
-    std::cout << "read: " << answer << std::endl;
+#ifdef DEBUG
+    std::cout << "read   : " << answer << std::endl;
+#endif
     return answer;
 }
 
