@@ -7,6 +7,7 @@
 #include "melfa/exceptions.h"
 #include "melfa/melfa.h"
 
+//#define DEBUG
 
 // formats the value to have 2 digits after the comma
 std::string format(double val)
@@ -238,6 +239,7 @@ void melfa::Melfa::initRobot()
     sendCommand("1;1;PRGLOAD=COSIROP"); // we have to load an empty program
     sendCommand("1;1;SRVON");
     sleep(2); // wait for servo on
+    execute("BASE (0,0,0,0,0,0,0,0)");
 }
 
 void melfa::Melfa::deInitRobot()
