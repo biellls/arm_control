@@ -1,0 +1,17 @@
+# all joint states are given in radiants
+
+# all tool poses given in x, y, z, roll, pitch, yaw
+# units are meters and radiants
+
+# joint poses that form a path
+joint_path: [
+                [0.7041, 0.4386, 1.6783, 0.0297, 1.0090, -0.1218]
+            ]
+
+# tool poses that form a path
+tool_path: [
+                [0.39978, 0.34240, 0.44040, 3.1184, 0.0185, -2.3312],
+                [0.39978, -0.30081, 0.44040, 3.1184, 0.0185, -2.3312],
+                [0.39978, 0.34240, 0.44040, 3.1184, 0.0185, -2.3312]
+           ]
+
