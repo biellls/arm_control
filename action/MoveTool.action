@@ -5,6 +5,6 @@ geometry_msgs/Pose target_pose
 # result
 geometry_msgs/Pose end_pose
 ---
-# feedback
-geometry_msgs/Pose current_pose
-
+# feedback: none! We want to limit robot traffic.
+# Get feedback from robot_arm topics
+#geometry_msgs/Pose current_pose

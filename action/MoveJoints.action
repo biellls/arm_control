@@ -4,6 +4,7 @@ sensor_msgs/JointState target_joint_state
 # result
 sensor_msgs/JointState end_joint_state 
 ---
-# feedback
-sensor_msgs/JointState current_joint_state 
+# feedback: none! we want to limit robot traffic,
+# get feedback from robot_arm topics!
+# sensor_msgs/JointState current_joint_state 
 
