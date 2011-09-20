@@ -1,0 +1,12 @@
+# sets the tool parameter of the robot
+
+# offset in meters
+float32 x
+float32 y
+float32 z
+# angles in radiants
+float32 roll
+float32 pitch
+float32 yaw
+---
+bool ok

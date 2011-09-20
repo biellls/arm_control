@@ -5,6 +5,7 @@
 
 #include "arm_control/MoveToolAction.h"
 #include "arm_control/MoveJointsAction.h"
+#include "arm_control/SetTool.h"
 #include "melfa_ros/conversions.h"
 
 #include "melfa/melfa.h"
@@ -28,6 +29,8 @@ class ArmControlNode
 
     actionlib::SimpleActionServer<ac::MoveToolAction> move_tool_action_server_;
     actionlib::SimpleActionServer<ac::MoveJointsAction> move_joints_action_server_;
+
+    ros::ServiceServer set_tool_service_server_;
 
   public:
     ArmControlNode() : nh_("robot_arm"), nh_private_("~"), 
@@ -57,6 +60,10 @@ class ArmControlNode
         nh_private_.param<double>("tool_roll", tool_roll, 0.0);
         nh_private_.param<double>("tool_pitch", tool_pitch, 0.0);
         nh_private_.param<double>("tool_yaw", tool_yaw, 0.0);
+        if (tool_roll < -M_PI || tool_roll > M_PI ||
+            tool_pitch < - M_PI || tool_roll > M_PI ||
+            tool_yaw < -M_PI || tool_yaw > M_PI)
+          ROS_FATAL("Invalid tool parameters given!");
 
         try
         {
@@ -67,11 +74,11 @@ class ArmControlNode
             ROS_INFO("Robot connected.");
             melfa_.setOverride(override);
             ROS_INFO("Override set to %i", override);
-            //melfa_.setJointOverride(joint_override);
-            //ROS_INFO("Joint override set to %i", joint_override);
             melfa_.setTool(tool_x, tool_y, tool_z, tool_roll, tool_pitch, tool_yaw);
             ROS_INFO("Tool set to (%f, %f, %f) (%f, %f, %f)", 
                     tool_x, tool_y, tool_z, tool_roll, tool_pitch, tool_yaw);
+            ROS_INFO_STREAM("Current tool pose: " << melfa_.getToolPose());
+
         }
         catch (melfa::SerialConnectionError& err)
         {
@@ -94,6 +101,8 @@ class ArmControlNode
         move_joints_action_server_.registerGoalCallback(boost::bind(&ArmControlNode::moveJointsGoalCB, this));
         move_joints_action_server_.start();
         ROS_INFO("Move Joints Action server started.");
+
+        set_tool_service_server_ = nh_.advertiseService("set_tool", &ArmControlNode::setTool, this);
     }
 
     void moveToolGoalCB()
@@ -114,11 +123,7 @@ class ArmControlNode
             while (melfa_.isBusy())
             {
                 usleep(200000);
-                // get current pose as feedback
-                ac::MoveToolFeedback feedback;
-                melfa_ros::toolPoseToPoseMsg(melfa_.getToolPose(), feedback.current_pose);
-                move_tool_action_server_.publishFeedback(feedback);
-
+                // we don't give feedback here to limit robot traiffic
                 if (move_tool_action_server_.isPreemptRequested())
                 {
                     ROS_INFO("MoveToolAction preempted.");
@@ -169,11 +174,7 @@ class ArmControlNode
             while (melfa_.isBusy())
             {
                 usleep(200000);
-                // get current pose as feedback
-                ac::MoveJointsFeedback feedback;
-                melfa_ros::jointStateToJointStateMsg(melfa_.getJointState(), feedback.current_joint_state);
-                move_joints_action_server_.publishFeedback(feedback);
-
+                // we don't give feedback here to limit robot traiffic
                 if (move_joints_action_server_.isPreemptRequested())
                 {
                     ROS_INFO("MoveJointsAction preempted.");
@@ -206,7 +207,22 @@ class ArmControlNode
         }
     }
 
-
+    bool setTool(arm_control::SetTool::Request  &req, arm_control::SetTool::Response &res)
+    {
+        res.ok = false;
+        try
+        {
+            melfa_.setTool(req.x, req.y, req.z, req.roll, req.pitch, req.yaw);
+            res.ok = true;
+            return true;
+        }
+        catch (const melfa::MelfaException& e)
+        {
+            ROS_ERROR("Exception occured when trying to set the tool: %s", e.what());
+            return false;
+        }
+    }
+ 
     void report()
     {
         try

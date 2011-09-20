@@ -25,7 +25,7 @@ include_directories(${PROJECT_SOURCE_DIR}/include)
 #uncomment if you have defined messages
 rosbuild_genmsg()
 #uncomment if you have defined services
-#rosbuild_gensrv()
+rosbuild_gensrv()
 
 rosbuild_add_library(melfa src/melfa/melfa.cpp src/melfa/joint_state.cpp src/melfa/tool_pose.cpp)
 rosbuild_add_library(serial src/serial/serialcomm.cpp)
