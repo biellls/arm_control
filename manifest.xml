@@ -15,8 +15,10 @@
   <depend package="tf"/>
   <depend package="actionlib_msgs"/>
   <depend package="actionlib"/>
-  <depend package="yaml_cpp"/>
+  <depend package="common_rosdeps" />
   <depend package="nav_msgs"/>
+
+  <rosdep name="yaml-cpp"/>
 
 </package>
 

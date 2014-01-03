@@ -27,6 +27,8 @@ rosbuild_genmsg()
 #uncomment if you have defined services
 rosbuild_gensrv()
 
+rosbuild_add_boost_directories()
+
 rosbuild_add_library(melfa src/melfa/melfa.cpp src/melfa/joint_state.cpp src/melfa/tool_pose.cpp)
 rosbuild_add_library(serial src/serial/serialcomm.cpp)
 rosbuild_add_library(melfa_ros src/melfa_ros/robot_path.cpp src/melfa_ros/conversions.cpp)
@@ -44,8 +46,10 @@ target_link_libraries(batch_execute melfa)
 target_link_libraries(send_raw melfa)
 target_link_libraries(batch_send_raw melfa)
 target_link_libraries(move melfa)
+rosbuild_link_boost(move program_options)
+target_link_libraries(melfa_ros yaml-cpp)
 target_link_libraries(arm_control_node melfa melfa_ros)
-target_link_libraries(follow_path_node melfa_ros)
+target_link_libraries(follow_path_node melfa_ros yaml-cpp)
 target_link_libraries(create_pose_msg melfa_ros)
 
 rosbuild_add_gtest(melfa_ros_test test/melfa_ros_test.cpp)

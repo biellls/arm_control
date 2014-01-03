@@ -12,7 +12,7 @@ void melfa_ros::poseMsgToToolPose(const geometry_msgs::Pose& pose_msg, melfa::To
     tool_pose.z = pose_msg.position.z;
     tf::Quaternion quat;
     tf::quaternionMsgToTF(pose_msg.orientation, quat);
-    btMatrix3x3(quat).getRPY(tool_pose.roll, tool_pose.pitch, tool_pose.yaw);
+    tf::Matrix3x3(quat).getRPY(tool_pose.roll, tool_pose.pitch, tool_pose.yaw);
 }
 
 void melfa_ros::toolPoseToPoseMsg(const melfa::ToolPose& tool_pose, geometry_msgs::Pose& pose_msg)
