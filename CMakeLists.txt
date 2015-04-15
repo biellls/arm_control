@@ -1,64 +1,99 @@
-cmake_minimum_required(VERSION 2.4.6)
-include($ENV{ROS_ROOT}/core/rosbuild/rosbuild.cmake)
+cmake_minimum_required(VERSION 2.8.3)
+project(arm_control)
 
-# Set the build type.  Options are:
-#  Coverage       : w/ debug symbols, w/o optimization, w/ code-coverage
-#  Debug          : w/ debug symbols, w/o optimization
-#  Release        : w/o debug symbols, w/ optimization
-#  RelWithDebInfo : w/ debug symbols, w/ optimization
-#  MinSizeRel     : w/o debug symbols, w/ optimization, stripped binaries
-#set(ROS_BUILD_TYPE RelWithDebInfo)
+find_package(catkin REQUIRED COMPONENTS
+  roscpp
+  message_generation
+  actionlib_msgs
+  actionlib
+  std_msgs
+  geometry_msgs
+  sensor_msgs
+  tf
+  nav_msgs)
+find_package(Boost REQUIRED COMPONENTS program_options system)
 
-rosbuild_find_ros_package(actionlib_msgs)
-include(${actionlib_msgs_PACKAGE_PATH}/cmake/actionbuild.cmake)
-genaction()
+if (UNIX)
+  find_library(YAMLCPP_LIBRARY NAMES yaml-cpp)
+  find_file(YAMLCPP_HAVE_H yaml-cpp/yaml.h )
+  find_path(YAMLCPP_H_INCLUDE_DIR yaml-cpp/yaml.h )
+  SET(YAMLCPP_INCLUDE_DIR ${YAMLCPP_H_INCLUDE_DIR}/yaml-cpp)
+else()
+  find_library(
+    YAMLCPP_LIBRARY
+    NAMES yamlcpp.lib
+    NO_DEFAULT_PATH
+    PATHS
+    $ENV{YAMLCPP_ROOT}/lib
+  )
+  find_file(YAMLCPP_HAVE_H include/yaml.h PATHS $ENV{YAMLCPP_ROOT} NO_DEFAULT_PATH)
+  find_path(YAMLCPP_H_INCLUDE_DIR include/yaml.h PATHS $ENV{YAMLCPP_ROOT} NO_DEFAULT_PATH)
+  SET(YAMLCPP_INCLUDE_DIR ${YAMLCPP_H_INCLUDE_DIR}/include)
+endif(UNIX)
 
-rosbuild_init()
+SET(YAMLCPP_FOUND FALSE)
+if (YAMLCPP_HAVE_H)
+  if (YAMLCPP_LIBRARY)
+    SET(YAMLCPP_FOUND TRUE)
+  endif (YAMLCPP_LIBRARY)
+endif (YAMLCPP_HAVE_H)
 
-#set the default path for built executables to the "bin" directory
-set(EXECUTABLE_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/bin)
-#set the default path for built libraries to the "lib" directory
-set(LIBRARY_OUTPUT_PATH ${PROJECT_SOURCE_DIR}/lib)
+if(NOT YAMLCPP_FOUND)
+  message(STATUS "YamlCpp Can't be found")
+  break()
+else()
+  message(STATUS "YamlCpp Library: " ${YAMLCPP_LIBRARY} )
+  message(STATUS "YamlCpp Header: " ${YAMLCPP_INCLUDE_DIR} )
+endif(NOT YAMLCPP_FOUND)
 
-include_directories(${PROJECT_SOURCE_DIR}/include)
+add_service_files(FILES
+  SetTool.srv
+)
 
-#uncomment if you have defined messages
-rosbuild_genmsg()
-#uncomment if you have defined services
-rosbuild_gensrv()
+add_action_files(DIRECTORY action FILES MoveJoints.action MoveTool.action)
 
-rosbuild_add_boost_directories()
+generate_messages(DEPENDENCIES
+  std_msgs
+  actionlib_msgs
+  geometry_msgs
+  sensor_msgs)
 
-rosbuild_add_library(melfa src/melfa/melfa.cpp src/melfa/joint_state.cpp src/melfa/tool_pose.cpp)
-rosbuild_add_library(serial src/serial/serialcomm.cpp)
-rosbuild_add_library(melfa_ros src/melfa_ros/robot_path.cpp src/melfa_ros/conversions.cpp)
-rosbuild_add_executable(execute src/tools/execute.cpp)
-rosbuild_add_executable(batch_execute src/tools/batch_execute.cpp)
-rosbuild_add_executable(send_raw src/tools/send_raw.cpp)
-rosbuild_add_executable(batch_send_raw src/tools/batch_send_raw.cpp)
-rosbuild_add_executable(move src/tools/move.cpp)
-rosbuild_add_executable(create_pose_msg src/tools/create_pose_msg.cpp)
-rosbuild_add_executable(arm_control_node src/nodes/arm_control_node.cpp)
-rosbuild_add_executable(follow_path_node src/nodes/follow_path_node.cpp)
-target_link_libraries(melfa serial)
+catkin_package(
+  INCLUDE_DIRS include
+  CATKIN_DEPENDS roscpp message_runtime actionlib_msgs actionlib std_msgs geometry_msgs sensor_msgs tf nav_msgs
+  DEPENDS Boost)
+
+include_directories(include
+                    ${catkin_INCLUDE_DIRS}
+                    ${Boost_INCLUDE_DIRS})
+
+add_library(melfa src/melfa/melfa.cpp
+                  src/melfa/joint_state.cpp
+                  src/melfa/tool_pose.cpp)
+add_library(serial src/serial/serialcomm.cpp)
+add_library(melfa_ros src/melfa_ros/robot_path.cpp
+                      src/melfa_ros/conversions.cpp)
+add_executable(execute src/tools/execute.cpp)
+add_executable(batch_execute src/tools/batch_execute.cpp)
+add_executable(send_raw src/tools/send_raw.cpp)
+add_executable(batch_send_raw src/tools/batch_send_raw.cpp)
+add_executable(move src/tools/move.cpp)
+add_executable(create_pose_msg src/tools/create_pose_msg.cpp)
+add_executable(arm_control_node src/nodes/arm_control_node.cpp)
+add_executable(follow_path_node src/nodes/follow_path_node.cpp)
+target_link_libraries(melfa serial ${catkin_LIBRARIES})
 target_link_libraries(execute melfa)
 target_link_libraries(batch_execute melfa)
 target_link_libraries(send_raw melfa)
 target_link_libraries(batch_send_raw melfa)
-target_link_libraries(move melfa)
-rosbuild_link_boost(move program_options)
-target_link_libraries(melfa_ros yaml-cpp)
-target_link_libraries(arm_control_node melfa melfa_ros)
-target_link_libraries(follow_path_node melfa_ros yaml-cpp)
+target_link_libraries(move melfa ${Boost_LIBRARIES})
+target_link_libraries(move ${Boost_LIBRARIES})
+target_link_libraries(melfa_ros yaml-cpp ${catkin_LIBRARIES})
+target_link_libraries(arm_control_node melfa
+                                       melfa_ros)
+add_dependencies(arm_control_node arm_control_gen_cpp)
+target_link_libraries(follow_path_node melfa_ros)
 target_link_libraries(create_pose_msg melfa_ros)
 
-rosbuild_add_gtest(melfa_ros_test test/melfa_ros_test.cpp)
+catkin_add_gtest(melfa_ros_test test/melfa_ros_test.cpp)
 target_link_libraries(melfa_ros_test melfa_ros)
-
-#common commands for building c++ executables and libraries
-#target_link_libraries(${PROJECT_NAME} another_library)
-#rosbuild_add_boost_directories()
-#rosbuild_link_boost(${PROJECT_NAME} thread)
-#rosbuild_add_executable(example examples/example.cpp)
-#target_link_libraries(example ${PROJECT_NAME})
-
