@@ -60,6 +60,7 @@ generate_messages(DEPENDENCIES
 
 catkin_package(
   INCLUDE_DIRS include
+  LIBRARIES melfa melfa_ros serial
   CATKIN_DEPENDS roscpp message_runtime actionlib_msgs actionlib std_msgs geometry_msgs sensor_msgs tf nav_msgs
   DEPENDS Boost)
 
