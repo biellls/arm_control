@@ -2,11 +2,12 @@
 #include "std_msgs/String.h"
 #include <iostream>
 #include <fstream>
+#include <vector>
 #include "melfa/melfa.h"
 #include "melfa/exceptions.h"
 
 // Debug variable permits debugging without being connected to the robot
-#define DEBUG true
+#define DEBUG false
 
 // Control messages
 #define CTL_EXECUTE "---SINGLE INSTRUCTION---"
@@ -47,9 +48,9 @@ enum States
 States state; // Current state
 
 #define PROGRAM_FILE "program.mb4"
-#define POINTS_FILE "points.pos"
+#define POINTS_FILE "points.POS"
 
-std::ofstream program_file, points_file;
+std::fstream program_file, points_file;
 
 // Given a state returns a string representation
 // Useful for printing errors
@@ -71,16 +72,129 @@ bool isControlMessage(std::string msg)
     msg == CTL_POINTS_END;
 }
 
-void clearProgramFile() {
+void send_command(std::string command)
+{
+  std::cout << "Sending command: " << command << std::endl;
+  if (DEBUG) return;
+
+  std::string device_name("/dev/ttyUSB0");
+  melfa::Melfa::ConfigParams params;
+  params.device = std::string(device_name);
+
+  melfa::Melfa melfa(params);
+  try
+    {
+      //melfa.connect();
+      std::cout << "Robot connected." << std::endl;
+      std::cout << "Executing command: " << command << std::endl;
+      melfa.sendCommand(command);
+      std::cout << "Execution finished." << std::endl;
+    }
+  catch (melfa::SerialConnectionError& err)
+    {
+      std::cerr << "Serial Connection error: " << err.what() << std::endl;
+    }
+  catch (melfa::RobotError& err)
+    {
+      std::cerr << "Robot error: " << err.what() << std::endl;
+    }
 }
 
-void clearPointsFile() {
+void initSequence() {
+  send_command("1;1;OPEN=NARCUSR");
+  send_command("1;1;PARRLNG");
+  send_command("1;1;PDIRTOP");
+  send_command("1;1;PPOSF");
+  send_command("1;1;PARMEXTL");
+  send_command("1;1;KEYWDptest");
 }
+
+void prepareLoad() {
+  send_command("1;1;NEW");
+  send_command("1;1;LOAD=1");
+  send_command("1;1;PRTVERLISTL");
+  send_command("1;1;PRTVEREMDAT");
+}
+
+std::string join(std::vector<std::string> v, std::string separator) {
+  std::stringstream ss;
+  for (size_t i = 0; i < v.size(); i++) {
+    if (i != 0)
+      ss << separator;
+    ss << v[i];
+  }
+  return ss.str();
+}
+
+std::string getLineNum(std::string line) {
+  return line.substr(0, line.find(" "));
+}
+
+void sendProgramLines() {
+  send_command("1;9;LISTL<");
+  if (program_file.is_open())
+    program_file.close();
+  program_file.open(PROGRAM_FILE);
+
+  std::vector<std::string> v;
+  std::string linenum;
+  std::string line;
+  while (std::getline(program_file, line)) {
+    linenum = getLineNum(line);
+    v.push_back(linenum);
+  }
+  std::string command = "1;9;EMDAT" + join(v, "<vt>");
+  send_command(command);
+}
+
+void sendProgram() {
+  if (program_file.is_open())
+    program_file.close();
+  program_file.open(PROGRAM_FILE);
+
+  std::vector<std::string> v;
+  std::string line;
+  while (std::getline(program_file, line)) {
+    //Strip \n
+    line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
+    v.push_back(line);
+  }
+  std::string command = "1;9;EMDAT" + join(v, "<vt>");
+  send_command(command);
+
+  send_command("1;1;SAVE");
+}
+
+void sendPoints() {
+  if (points_file.is_open())
+    points_file.close();
+  points_file.open(POINTS_FILE);
+
+  std::vector<std::string> v;
+  std::string line;
+  while (std::getline(points_file, line)) {
+    //Strip \n
+    line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
+    v.push_back(line);
+  }
+  std::string command = "1;9;EMDAT" + join(v, "<vt>");
+  send_command(command);
+
+  send_command("1;1;SAVE");
+}  
 
 void loadProgram() {
+  //Init sequence TODO mirar si hay que sacarlo fuera para sustituir a initrobot
+  initSequence();
+  prepareLoad();
+  sendProgramLines();
+  sendProgram();
 }
 
 void loadPoints() {
+  //initSequence();
+  prepareLoad();
+  sendPoints();
 }
 
 void nextState(std::string msg)
@@ -97,8 +211,9 @@ void nextState(std::string msg)
     //until we are told to load it to the robot
     if (msg == CTL_PROGRAM_BEGIN) {
       ROS_INFO("CTL_PROGRAM_BEGIN");
-      //clearProgramFile();
-      program_file.open(PROGRAM_FILE);
+      if (program_file.is_open())
+        program_file.close();
+      program_file.open(PROGRAM_FILE, std::fstream::out);  //Will overwrite file contents
       state = S2;
       return;
     }
@@ -106,8 +221,9 @@ void nextState(std::string msg)
     // until we are told to load it to the robot
     if (msg == CTL_POINTS_BEGIN) {
       ROS_INFO("CTL_POINTS_BEGIN");
-      points_file.open(PROGRAM_FILE);
-      //clearPointsFile();
+      if (points_file.is_open())
+        points_file.close();
+      points_file.open(POINTS_FILE, std::fstream::out);  //Will overwrite file contents
       state = S3;
       return;
     }
@@ -154,8 +270,8 @@ void execute_command(std::string command)
   melfa::Melfa melfa(params);
   try
     {
-      melfa.connect();
-      std::cout << "Robot connected." << std::endl;
+      //melfa.connect();
+      //std::cout << "Robot connected." << std::endl;
       std::cout << "Executing command: " << command << std::endl;
       melfa.execute(command);
       std::cout << "Execution finished." << std::endl;
@@ -206,7 +322,6 @@ void executeCallback(const std_msgs::String::ConstPtr& msg)
   }
 
   handleMessage(message);
-
 }
 
 int main(int argc, char* argv[])
