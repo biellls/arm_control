@@ -58,9 +58,19 @@ class Melfa
         void connect();
 
         /**
+        * \brief connects to the robot to lad a file
+        */
+        void connectForLoad();
+
+        /**
         * \brief disconnects from the robot
         */
         void disconnect();
+
+        /**
+        * \brief disconnects from the robot
+        */
+        void disconnectForLoad();
 
         /**
         * \brief asks the robot for its state and returns true if
@@ -143,9 +153,19 @@ class Melfa
         void initRobot();
 
         /**
+        * \brief initializes the robot. called in connectForLoad.
+        */
+        void initRobotForLoad();
+
+        /**
         * \brief de-initializes the robot. called in disconnect.
         */
         void deInitRobot();
+
+        /**
+        * \brief de-initializes the robot. called in disconnectForLoad.
+        */
+        void deInitRobotForLoad();
 
         /**
         * \brief reads a position

@@ -76,12 +76,66 @@ void melfa::Melfa::connect()
     initRobot();
 }
 
+void melfa::Melfa::connectForLoad()
+{
+    boost::mutex::scoped_lock connection_lock(connection_mutex_);
+    int status;
+    {
+        boost::mutex::scoped_lock lock(comm_mutex_);
+        if (!comm_.openDevice(params_.device, status))
+            throw SerialConnectionError("Melfa::connect(): could not open device.");
+
+        std::string error("Melfa::connect():");
+        bool ok;
+        bool all_ok = true;
+        ok = comm_.setBaudRate(9600);
+        all_ok &= ok;
+        if (!ok) error += " cannot set baud rate";
+        ok = comm_.setDataBits(serial::SerialComm::DB8);
+        all_ok &= ok;
+        if (!ok) error += " cannot set data bits";
+        ok = comm_.setStopBits(serial::SerialComm::TWO_STOP_BITS);
+        all_ok &= ok;
+        if (!ok) error += " cannot set stop bits";
+        ok = comm_.setParity(serial::SerialComm::EVEN_PARITY); 
+        all_ok &= ok;
+        if (!ok) error += " cannot set parity";
+        ok = comm_.initRawComm(status);
+        all_ok &= ok;
+        if (!ok) error += " cannot init comm";
+        ok = comm_.setReadTimeout(2000);
+        all_ok &= ok;
+        if (!ok) error += " cannot set read timeout";
+        if (!all_ok)
+        {
+            comm_.closeDevice(status);
+            throw SerialConnectionError(error);
+        }
+        connected_ = true;
+    }
+    initRobotForLoad();
+}
+
+
 void melfa::Melfa::disconnect()
 {
     boost::mutex::scoped_lock connection_lock(connection_mutex_);
     if (connected_)
     {
         deInitRobot();
+        boost::mutex::scoped_lock lock(comm_mutex_);
+        int status;
+        comm_.closeDevice(status);
+        connected_ = false;
+    }
+}
+
+void melfa::Melfa::disconnectForLoad()
+{
+    boost::mutex::scoped_lock connection_lock(connection_mutex_);
+    if (connected_)
+    {
+        deInitRobotForLoad();
         boost::mutex::scoped_lock lock(comm_mutex_);
         int status;
         comm_.closeDevice(status);
@@ -242,11 +296,27 @@ void melfa::Melfa::initRobot()
     execute("BASE (0,0,0,0,0,0,0,0)");
 }
 
+void melfa::Melfa::initRobotForLoad()
+{
+    sendCommand("1;1;OPEN=NARCUSR");
+    sendCommand("1;1;PARRLNG"); // or SLOTINIT?
+    sendCommand("1;1;PDIRTOP"); // we have to load an empty program
+    sendCommand("1;1;PPOSF");
+    sendCommand("1;1;PARMEXTL");
+    sendCommand("1;1;KEYWDptest");
+    sleep(2); // wait for servo on
+}
+
 void melfa::Melfa::deInitRobot()
 {
     sendCommand("1;1;SRVOFF");
     sleep(1); // wait for servo off
     sendCommand("1;1;CNTLOFF");
+    sendCommand("1;1;CLOSE");
+}
+
+void melfa::Melfa::deInitRobotForLoad()
+{
     sendCommand("1;1;CLOSE");
 }
 

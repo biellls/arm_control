@@ -85,7 +85,7 @@ void send_command(std::string command)
   try
     {
       //melfa.connect();
-      std::cout << "Robot connected." << std::endl;
+      //std::cout << "Robot connected." << std::endl;
       std::cout << "Executing command: " << command << std::endl;
       melfa.sendCommand(command);
       std::cout << "Execution finished." << std::endl;
@@ -101,13 +101,57 @@ void send_command(std::string command)
 }
 
 void initSequence() {
-  send_command("1;1;OPEN=NARCUSR");
-  send_command("1;1;PARRLNG");
-  send_command("1;1;PDIRTOP");
-  send_command("1;1;PPOSF");
-  send_command("1;1;PARMEXTL");
-  send_command("1;1;KEYWDptest");
+  if (DEBUG) return;
+
+  std::string device_name("/dev/ttyUSB0");
+  melfa::Melfa::ConfigParams params;
+  params.device = std::string(device_name);
+
+  melfa::Melfa melfa(params);
+  try
+    {
+      melfa.connectForLoad();
+      std::cout << "Robot connected." << std::endl;
+      //std::cout << "Executing command: " << command << std::endl;
+      //melfa.sendCommand(command);
+      //std::cout << "Execution finished." << std::endl;
+    }
+  catch (melfa::SerialConnectionError& err)
+    {
+      std::cerr << "Serial Connection error: " << err.what() << std::endl;
+    }
+  catch (melfa::RobotError& err)
+    {
+      std::cerr << "Robot error: " << err.what() << std::endl;
+    }
 }
+
+void closeSequence() {
+  if (DEBUG) return;
+
+  std::string device_name("/dev/ttyUSB0");
+  melfa::Melfa::ConfigParams params;
+  params.device = std::string(device_name);
+
+  melfa::Melfa melfa(params);
+  try
+    {
+      melfa.disconnectForLoad();
+      std::cout << "Robot connected." << std::endl;
+      //std::cout << "Executing command: " << command << std::endl;
+      //melfa.sendCommand(command);
+      //std::cout << "Execution finished." << std::endl;
+    }
+  catch (melfa::SerialConnectionError& err)
+    {
+      std::cerr << "Serial Connection error: " << err.what() << std::endl;
+    }
+  catch (melfa::RobotError& err)
+    {
+      std::cerr << "Robot error: " << err.what() << std::endl;
+    }
+}
+
 
 void prepareLoad() {
   send_command("1;1;NEW");
@@ -195,6 +239,7 @@ void loadPoints() {
   //initSequence();
   prepareLoad();
   sendPoints();
+  closeSequence();
 }
 
 void nextState(std::string msg)
