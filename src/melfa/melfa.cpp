@@ -299,8 +299,8 @@ void melfa::Melfa::initRobot()
 void melfa::Melfa::initRobotForLoad()
 {
     sendCommand("1;1;OPEN=NARCUSR");
-    sendCommand("1;1;PARRLNG"); // or SLOTINIT?
-    sendCommand("1;1;PDIRTOP"); // we have to load an empty program
+    sendCommand("1;1;PARRLNG");
+    sendCommand("1;1;PDIRTOP");
     sendCommand("1;1;PPOSF");
     sendCommand("1;1;PARMEXTL");
     sendCommand("1;1;KEYWDptest");

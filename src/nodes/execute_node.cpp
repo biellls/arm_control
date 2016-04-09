@@ -9,6 +9,11 @@
 // Debug variable permits debugging without being connected to the robot
 #define DEBUG false
 
+//Connection messages
+#define CTL_CONNECT_FOR_LOAD "---CONNECT FOR LOAD---"
+#define CTL_CONNECT_FOR_EXECUTE "---CONNECT FOR EXECUTE---"
+#define CTL_DISCONNECT "---DISCONNECT---"
+
 // Control messages
 #define CTL_EXECUTE "---SINGLE INSTRUCTION---"
 #define CTL_PROGRAM_BEGIN "---LOAD PROGRAM BEGIN---"
@@ -45,7 +50,15 @@ enum States
         // * Transition: _ -> S0
   };
 
+enum Connection_states
+  {
+    CONNECTED_FOR_LOAD,
+    CONNECTED_FOR_EXECUTE,
+    DISCONNECTED,
+  };
+
 States state; // Current state
+Connection_states connection_state;
 
 #define PROGRAM_FILE "program.mb4"
 #define POINTS_FILE "points.POS"
@@ -227,12 +240,100 @@ void sendPoints() {
   send_command("1;1;SAVE");
 }  
 
+void printResponse(std::vector<std::string> response) {
+  std::stringstream ss;
+  for (size_t i = 0; i < response.size(); i++) {
+    ss << response[i];
+    std::cout << "Response = " << ss << std::endl;
+  }
+}
+
 void loadProgram() {
   //Init sequence TODO mirar si hay que sacarlo fuera para sustituir a initrobot
-  initSequence();
-  prepareLoad();
-  sendProgramLines();
-  sendProgram();
+  //initSequence();
+  //prepareLoad();
+  //sendProgramLines();
+  //sendProgram();
+  if (DEBUG) return;
+
+  std::string device_name("/dev/ttyUSB0");
+  melfa::Melfa::ConfigParams params;
+  params.device = std::string(device_name);
+
+  melfa::Melfa melfa(params);
+  try
+    {
+      melfa.connectForLoad();
+      std::cout << "Robot connected." << std::endl;
+
+      //Prepare load
+      printResponse(melfa.sendCommand("1;1;NEW"));
+      printResponse(melfa.sendCommand("1;1;LOAD=1"));
+      printResponse(melfa.sendCommand("1;1;PRTVERLISTL"));
+      printResponse(melfa.sendCommand("1;1;PRTVEREMDAT"));
+      std::cout << "Load prepared." << std::endl;
+
+      std::cout << "Sending command: 1;9;LISTL<" << std::endl;
+      //std::vector<std::string> response = melfa.sendCommand("1;9;LISTL<");
+      std::vector<std::string> response = melfa.sendCommand("1;9;LISTL");
+      std::stringstream ss;
+      for (size_t i = 0; i < response.size(); i++) {
+        ss << response[i];
+        std::cout << "Response = " << ss << std::endl;
+      }
+
+      //Send program lines
+      if (program_file.is_open())
+        program_file.close();
+      program_file.open(PROGRAM_FILE);
+
+      std::vector<std::string> v;
+      std::string linenum;
+      std::string line;
+      while (std::getline(program_file, line)) {
+        linenum = getLineNum(line);
+        v.push_back(linenum);
+      }
+      //std::string command = "1;9;EMDAT" + join(v, "<VT>");
+      std::string command = "1;9;EMDAT" + join(v, "\v");
+      std::cout << "Sending command: " << command << std::endl;
+      //melfa.sendCommand(command);
+      melfa.sendCommand("1;9;EMDAT10\v20\v30\v40");
+      melfa.sendCommand("1;9;EMDAT10 OVRD 30\v20 MOV P1\v30 MOV P5\v40 END");
+
+      std::cout << "Program lines sent." << std::endl;
+
+      //Send program
+      if (program_file.is_open())
+        program_file.close();
+      program_file.open(PROGRAM_FILE);
+
+      std::vector<std::string> v2;
+      while (std::getline(program_file, line)) {
+        //Strip \n
+        line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
+        v2.push_back(line);
+      }
+      std::cout << "Sending command: " << command << std::endl;
+      command = "1;9;EMDAT" + join(v2, "\v");
+      //melfa.sendCommand(command);
+      std::cout << "Program sent." << std::endl;
+
+      //Save file
+      send_command("1;1;SAVE");
+      //std::cout << "Executing command: " << command << std::endl;
+      //melfa.sendCommand(command);
+      //std::cout << "Execution finished." << std::endl;
+    }
+  catch (melfa::SerialConnectionError& err)
+    {
+      std::cerr << "Serial Connection error: " << err.what() << std::endl;
+    }
+  catch (melfa::RobotError& err)
+    {
+      std::cerr << "Robot error: " << err.what() << std::endl;
+    }
+
 }
 
 void loadPoints() {
@@ -277,14 +378,14 @@ void nextState(std::string msg)
     state = S0;
     return;
   } else if (state == S2 && msg == CTL_PROGRAM_END) {
-      ROS_INFO("CTL_PROGRAM_END");
+    ROS_INFO("CTL_PROGRAM_END");
     //We load the program file to the robot
     loadProgram();
     program_file.close();
     state = S0;
     return;
   } else if (state == S3 && msg == CTL_POINTS_END) {
-      ROS_INFO("CTL_POINTS_END");
+    ROS_INFO("CTL_POINTS_END");
     //We load the points file to the robot
     loadPoints();
     points_file.close();
@@ -333,6 +434,19 @@ void execute_command(std::string command)
 
 void handleMessage(std::string msg)
 {
+  //Connection messages
+  if (msg == CTL_CONNECT_FOR_LOAD) {
+    //Connect for load
+    return;
+  } else if (msg == CTL_CONNECT_FOR_EXECUTE) {
+    //Connect for execute
+    return;
+  } else if (msg == CTL_DISCONNECT) {
+    //Disconnect
+    return;
+  }
+
+  //Execute and load messages
   ROS_INFO("Handling message: %s", msg.c_str());
   if (state == S1) {
     ROS_INFO("Execute command: %s", msg.c_str());
@@ -372,6 +486,7 @@ void executeCallback(const std_msgs::String::ConstPtr& msg)
 int main(int argc, char* argv[])
 {
   state = S0;
+  connection_state = DISCONNECTED;
 
   ros::init(argc, argv, "execute_node");
 
