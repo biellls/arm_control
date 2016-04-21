@@ -10,7 +10,7 @@ int main(int argc, char* argv[])
     {
         std::cerr << "Usage: " << argv[0] 
             << " <device name> <MELFA BASIC IV command>" << std::endl;
-        std::cerr << "Use cuotes for the command." << std::endl;
+        std::cerr << "Use quotes for the command." << std::endl;
         return -1;
     }
 

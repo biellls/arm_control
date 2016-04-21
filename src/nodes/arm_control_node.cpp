@@ -50,7 +50,7 @@ class ArmControlNode
         nh_private_.param<std::string>("device", device, "/dev/ttyUSB0");
         ROS_INFO("using device %s", device.c_str());
         int override;
-        nh_private_.param<int>("override", override, 50);
+        nh_private_.param<int>("override", override, 10);
         //int joint_override;
         //nh_private_.param<int>("joint_override", joint_override, 50);
         double tool_x, tool_y, tool_z, tool_roll, tool_pitch, tool_yaw;
