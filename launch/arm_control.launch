@@ -1,0 +1,11 @@
+<launch>
+  <node name="arm_control" pkg="arm_control" type="arm_control_node" output="screen">
+    <param name="override" value="3" />
+    <param name="tool_x" value="0.0" />
+    <param name="tool_y" value="0.0" />
+    <param name="tool_z" value="0.0" />
+    <param name="tool_roll" value="0.0" />
+    <param name="tool_pitch" value="0.0" />
+    <param name="tool_yaw" value="0.0" />
+  </node>
+</launch>
