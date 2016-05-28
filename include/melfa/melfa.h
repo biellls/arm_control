@@ -56,6 +56,7 @@ class Melfa
         * \brief connects to the robot
         */
         void connect();
+        void connect0();
 
         /**
         * \brief connects to the robot to lad a file

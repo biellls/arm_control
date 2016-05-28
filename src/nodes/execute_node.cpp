@@ -20,6 +20,7 @@
 #define CTL_PROGRAM_END "---LOAD PROGRAM END---"
 #define CTL_POINTS_BEGIN "---LOAD POINTS BEGIN---"
 #define CTL_POINTS_END "---LOAD POINTS END---"
+#define CTL_RUN_PROGRAM "---RUN PROGRAM---"
 
 /*
  * State machine states
@@ -63,6 +64,9 @@ Connection_states connection_state;
 #define PROGRAM_FILE "program.mb4"
 #define POINTS_FILE "points.POS"
 
+// Constants
+#define MAX_COMMAND_CHARS 256
+
 std::fstream program_file, points_file;
 
 // Given a state returns a string representation
@@ -73,16 +77,6 @@ std::string stateName(States s)
   else if (s == S1) return "S1";
   else if (s == S2) return "S2";
   else return "S3";
-}
-
-bool isControlMessage(std::string msg)
-{
-  return
-    msg == CTL_EXECUTE ||
-    msg == CTL_PROGRAM_BEGIN ||
-    msg == CTL_PROGRAM_END ||
-    msg == CTL_POINTS_BEGIN ||
-    msg == CTL_POINTS_END;
 }
 
 void send_command(std::string command)
@@ -97,7 +91,7 @@ void send_command(std::string command)
   melfa::Melfa melfa(params);
   try
     {
-      //melfa.connect();
+      melfa.connect();
       //std::cout << "Robot connected." << std::endl;
       std::cout << "Executing command: " << command << std::endl;
       melfa.sendCommand(command);
@@ -248,6 +242,41 @@ void printResponse(std::vector<std::string> response) {
   }
 }
 
+void runProgram() {
+  std::string device_name("/dev/ttyUSB0");
+  melfa::Melfa::ConfigParams params;
+  params.device = std::string(device_name);
+
+  melfa::Melfa melfa(params);
+  try
+    {
+      melfa.connectForLoad();
+      std::cout << "Robot connected." << std::endl;
+      
+      
+
+      std::cout << "Sending command: " << "1;1;STATE" << std::endl;
+      //melfa.sendCommand("1;1;STATE");
+      std::cout << "Sending command: " << "1;1;CNTLON" << std::endl;
+      melfa.sendCommand("1;1;CNTLON");
+      std::cout << "Sending command: " << "1;1;SLOTINIT" << std::endl;
+      melfa.sendCommand("1;1;SLOTINIT");
+      std::cout << "Sending command: " << "1;1;RUN;1" << std::endl;
+      melfa.sendCommand("1;1;RUN1;1");
+      std::cout << "Sending command: " << "1;1;CNTLOFF" << std::endl;
+      while (melfa.isBusy()) sleep(1);
+      melfa.sendCommand("1;1;CNTLOFF");
+    }
+  catch (melfa::SerialConnectionError& err)
+    {
+      std::cerr << "Serial Connection error: " << err.what() << std::endl;
+    }
+  catch (melfa::RobotError& err)
+    {
+      std::cerr << "Robot error: " << err.what() << std::endl;
+    }
+}
+
 void loadProgram() {
   //Init sequence TODO mirar si hay que sacarlo fuera para sustituir a initrobot
   //initSequence();
@@ -267,20 +296,15 @@ void loadProgram() {
       std::cout << "Robot connected." << std::endl;
 
       //Prepare load
-      printResponse(melfa.sendCommand("1;1;NEW"));
-      printResponse(melfa.sendCommand("1;1;LOAD=1"));
-      printResponse(melfa.sendCommand("1;1;PRTVERLISTL"));
-      printResponse(melfa.sendCommand("1;1;PRTVEREMDAT"));
+      melfa.sendCommand("1;1;NEW");
+      melfa.sendCommand("1;1;LOAD=1");
+      melfa.sendCommand("1;1;PRTVERLISTL");
+      melfa.sendCommand("1;1;PRTVEREMDAT");
       std::cout << "Load prepared." << std::endl;
 
       std::cout << "Sending command: 1;9;LISTL<" << std::endl;
       //std::vector<std::string> response = melfa.sendCommand("1;9;LISTL<");
-      std::vector<std::string> response = melfa.sendCommand("1;9;LISTL");
-      std::stringstream ss;
-      for (size_t i = 0; i < response.size(); i++) {
-        ss << response[i];
-        std::cout << "Response = " << ss << std::endl;
-      }
+      printResponse(melfa.sendCommand("1;9;LISTL<"));
 
       //Send program lines
       if (program_file.is_open())
@@ -294,12 +318,30 @@ void loadProgram() {
         linenum = getLineNum(line);
         v.push_back(linenum);
       }
-      //std::string command = "1;9;EMDAT" + join(v, "<VT>");
+      std::cout << "Sending program lines" << std::endl;
       std::string command = "1;9;EMDAT" + join(v, "\v");
-      std::cout << "Sending command: " << command << std::endl;
-      //melfa.sendCommand(command);
-      melfa.sendCommand("1;9;EMDAT10\v20\v30\v40");
-      melfa.sendCommand("1;9;EMDAT10 OVRD 30\v20 MOV P1\v30 MOV P5\v40 END");
+      if (command.length() < MAX_COMMAND_CHARS) {
+        std::cout << "Short program" << std::endl;
+        std::cout << "Sending command: " << command << std::endl;
+        melfa.sendCommand(command);
+      } else {    //If the command is too long break it down
+        std::cout << "Long program. Break into chunks and send over several instructions" << std::endl;
+        std::size_t start = 0;
+        std::size_t i = command.find("\v");
+        while(i != std::string::npos) {
+          std::size_t ni = command.find("\v", i+1);
+          if (ni > start + MAX_COMMAND_CHARS - 1) {
+            //send command substring
+            std::string cs = command.substr(start, i - start + 1);
+            std::cout << "Sending command: " << cs << std::endl;
+            melfa.sendCommand(cs);
+            start = i;
+          }
+          i = ni;
+        }
+      }
+      //melfa.sendCommand("1;9;EMDAT10\v20\v30\v40");
+      //melfa.sendCommand("1;9;EMDAT10 OVRD 30\v20 MOV P1\v30 MOV P5\v40 END");
 
       std::cout << "Program lines sent." << std::endl;
 
@@ -314,13 +356,32 @@ void loadProgram() {
         line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
         v2.push_back(line);
       }
-      std::cout << "Sending command: " << command << std::endl;
       command = "1;9;EMDAT" + join(v2, "\v");
-      //melfa.sendCommand(command);
+      std::cout << "Sending program" << std::endl;
+      if (command.length() < MAX_COMMAND_CHARS) {
+        std::cout << "Short program" << std::endl;
+        std::cout << "Sending command: " << command << std::endl;
+        melfa.sendCommand(command);
+      } else {    //If the command is too long break it down
+        std::cout << "Long program. Break into chunks and send over several instructions" << std::endl;
+        std::size_t start = 0;
+        std::size_t i = command.find("\v");
+        while(i != std::string::npos) {
+          std::size_t ni = command.find("\v", i+1);
+          if (ni > start + MAX_COMMAND_CHARS - 1) {
+            //send command substring
+            std::string cs = command.substr(start, i - start + 1);
+            std::cout << "Sending command: " << cs << std::endl;
+            melfa.sendCommand(cs);
+            start = i;
+          }
+          i = ni;
+        }
+      }
       std::cout << "Program sent." << std::endl;
 
       //Save file
-      send_command("1;1;SAVE");
+      melfa.sendCommand("1;1;SAVE");
       //std::cout << "Executing command: " << command << std::endl;
       //melfa.sendCommand(command);
       //std::cout << "Execution finished." << std::endl;
@@ -337,64 +398,54 @@ void loadProgram() {
 }
 
 void loadPoints() {
+  //Init sequence TODO mirar si hay que sacarlo fuera para sustituir a initrobot
   //initSequence();
-  prepareLoad();
-  sendPoints();
-  closeSequence();
-}
+  //prepareLoad();
+  //sendPoints();
+  //closeSequence();
+  if (DEBUG) return;
 
-void nextState(std::string msg)
-{
-  ROS_INFO("Heard control message: %s", msg.c_str());
-  if (state == S0) {
-    //We will execute the next instruction
-    if (msg == CTL_EXECUTE) {
-      ROS_INFO("CTL_EXECUTE");
-      state = S1;
-      return;
+  std::string device_name("/dev/ttyUSB0");
+  melfa::Melfa::ConfigParams params;
+  params.device = std::string(device_name);
+
+  melfa::Melfa melfa(params);
+  try
+    {
+      melfa.connectForLoad();
+      std::cout << "Robot connected." << std::endl;
+
+      //Prepare load
+      melfa.sendCommand("1;1;NEW");
+      melfa.sendCommand("1;1;LOAD=1");
+      melfa.sendCommand("1;1;PRTVERLISTL");
+      melfa.sendCommand("1;1;PRTVEREMDAT");
+      std::cout << "Load prepared." << std::endl;
+
+      std::string line;
+      std::vector<std::string> v2;
+      while (std::getline(program_file, line)) {
+        //Strip \n
+        line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
+        v2.push_back(line);
+      }
+      std::string command = "1;9;EMDAT" + join(v2, "\v");
+      std::cout << "Sending command: " << command << std::endl;
+      melfa.sendCommand(command);
+      std::cout << "Program sent." << std::endl;
+
+      //Save file
+      melfa.sendCommand("1;1;SAVE");
     }
-    //We will store the following instructions in a file
-    //until we are told to load it to the robot
-    if (msg == CTL_PROGRAM_BEGIN) {
-      ROS_INFO("CTL_PROGRAM_BEGIN");
-      if (program_file.is_open())
-        program_file.close();
-      program_file.open(PROGRAM_FILE, std::fstream::out);  //Will overwrite file contents
-      state = S2;
-      return;
+  catch (melfa::SerialConnectionError& err)
+    {
+      std::cerr << "Serial Connection error: " << err.what() << std::endl;
     }
-    //We will store the following points in a file
-    // until we are told to load it to the robot
-    if (msg == CTL_POINTS_BEGIN) {
-      ROS_INFO("CTL_POINTS_BEGIN");
-      if (points_file.is_open())
-        points_file.close();
-      points_file.open(POINTS_FILE, std::fstream::out);  //Will overwrite file contents
-      state = S3;
-      return;
+  catch (melfa::RobotError& err)
+    {
+      std::cerr << "Robot error: " << err.what() << std::endl;
     }
-    //ERROR
-    std::cerr << "Invalid control signal error: " << msg << std::endl;
-    state = S0;
-    return;
-  } else if (state == S2 && msg == CTL_PROGRAM_END) {
-    ROS_INFO("CTL_PROGRAM_END");
-    //We load the program file to the robot
-    loadProgram();
-    program_file.close();
-    state = S0;
-    return;
-  } else if (state == S3 && msg == CTL_POINTS_END) {
-    ROS_INFO("CTL_POINTS_END");
-    //We load the points file to the robot
-    loadPoints();
-    points_file.close();
-    state = S0;
-    return;
-  }
-  std::cerr << "Invalid control signal error: " << msg
-            << " for state " << stateName(state) << std::endl;
-  state = S0;
+
 }
 
 void writeToProgramFile(std::string msg) {
@@ -463,6 +514,79 @@ void handleMessage(std::string msg)
               << " for message " << msg << std::endl;
     state = S0;
   }
+}
+
+bool isControlMessage(std::string msg)
+{
+  return
+    msg == CTL_EXECUTE ||
+    msg == CTL_RUN_PROGRAM ||
+    msg == CTL_PROGRAM_BEGIN ||
+    msg == CTL_PROGRAM_END ||
+    msg == CTL_POINTS_BEGIN ||
+    msg == CTL_POINTS_END;
+}
+
+void nextState(std::string msg)
+{
+  ROS_INFO("Heard control message: %s", msg.c_str());
+  if (state == S0) {
+    //We will execute the next instruction
+    if (msg == CTL_EXECUTE) {
+      ROS_INFO("CTL_EXECUTE");
+      state = S1;
+      return;
+    }
+    //We run the program in slot 1 and stay in S0
+    if (msg == CTL_RUN_PROGRAM) {
+      ROS_INFO("RUN_PROGRAM");
+      runProgram();
+      //send_command("1;1;SLOTINIT");
+      //send_command("1;1;RUN;1");
+      return;
+    }
+    //We will store the following instructions in a file
+    //until we are told to load it to the robot
+    if (msg == CTL_PROGRAM_BEGIN) {
+      ROS_INFO("CTL_PROGRAM_BEGIN");
+      if (program_file.is_open())
+        program_file.close();
+      program_file.open(PROGRAM_FILE, std::fstream::out);  //Will overwrite file contents
+      state = S2;
+      return;
+    }
+    //We will store the following points in a file
+    // until we are told to load it to the robot
+    if (msg == CTL_POINTS_BEGIN) {
+      ROS_INFO("CTL_POINTS_BEGIN");
+      if (points_file.is_open())
+        points_file.close();
+      points_file.open(POINTS_FILE, std::fstream::out);  //Will overwrite file contents
+      state = S3;
+      return;
+    }
+    //ERROR
+    std::cerr << "Invalid control signal error: " << msg << std::endl;
+    state = S0;
+    return;
+  } else if (state == S2 && msg == CTL_PROGRAM_END) {
+    ROS_INFO("CTL_PROGRAM_END");
+    //We load the program file to the robot
+    loadProgram();
+    program_file.close();
+    state = S0;
+    return;
+  } else if (state == S3 && msg == CTL_POINTS_END) {
+    ROS_INFO("CTL_POINTS_END");
+    //We load the points file to the robot
+    loadPoints();
+    points_file.close();
+    state = S0;
+    return;
+  }
+  std::cerr << "Invalid control signal error: " << msg
+            << " for state " << stateName(state) << std::endl;
+  state = S0;
 }
 
 /*
