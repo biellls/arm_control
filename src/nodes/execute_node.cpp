@@ -625,6 +625,93 @@ void execute_command(std::string command)
     }
 }
 
+void requestAndPublishJointState() {
+  std::string device_name("/dev/ttyUSB0");
+  melfa::Melfa::ConfigParams params;
+  params.device = std::string(device_name);
+  
+  melfa::JointState jointState;
+  
+  melfa::Melfa melfa(params);
+  try {
+    melfa.connect();
+    std::cout << "Robot connected." << std::endl;
+    std::cout << "Requesting joint state: " << std::endl;
+    jointState = melfa.getJointState();
+    std::cout << "Joint state requested." << std::endl;
+  } catch (melfa::SerialConnectionError& err) {
+    std::cerr << "Serial Connection error: " << err.what() << std::endl;
+  } catch (melfa::RobotError& err) {
+    std::cerr << "Robot error: " << err.what() << std::endl;
+  }
+  std::cout << "Starting publish joint state" << std::endl;
+  std::ostringstream stringStream;
+  std::cout << jointState.j1 << std::endl;
+  stringStream <<
+    jointState.j1 << "," <<
+    jointState.j2 << "," <<
+    jointState.j3 << "," <<
+    jointState.j4 << "," <<
+    jointState.j5 << "," <<
+    jointState.j6;
+  std::cout << "Sending joint state: " << stringStream.str() << std::endl;
+  std_msgs::String msg;
+  msg.data = stringStream.str();
+  ros::NodeHandle n;
+  ros::Publisher joint_state_pub = n.advertise<std_msgs::String>("joint_state", 1000);
+  std::cout << "Waiting for subscribers" << std::endl;
+  while (joint_state_pub.getNumSubscribers() <= 0)
+    sleep(1);
+  joint_state_pub.publish(msg);
+  ros::spinOnce();
+  std::cout << "Joint state sent" << std::endl;
+}
+
+melfa::ToolPose requestToolPose() {
+  std::string device_name("/dev/ttyUSB0");
+  melfa::Melfa::ConfigParams params;
+  params.device = std::string(device_name);
+  
+  melfa::ToolPose toolPose;
+  
+  melfa::Melfa melfa(params);
+  try {
+    melfa.connect();
+    std::cout << "Robot connected." << std::endl;
+    std::cout << "Requesting tool pose: " << std::endl;
+    toolPose = melfa.getToolPose();
+    std::cout << "Tool pose requested." << std::endl;
+  } catch (melfa::SerialConnectionError& err) {
+    std::cerr << "Serial Connection error: " << err.what() << std::endl;
+  } catch (melfa::RobotError& err) {
+    std::cerr << "Robot error: " << err.what() << std::endl;
+  }
+  return toolPose;
+}
+
+void publishToolPose(melfa::ToolPose toolPose) {
+  std::cout << "Starting publish tool pose" << std::endl;
+  std::ostringstream stringStream;
+  stringStream <<
+    toolPose.x << "," <<
+    toolPose.y << "," <<
+    toolPose.z << "," <<
+    toolPose.roll << "," <<
+    toolPose.pitch << "," <<
+    toolPose.yaw;
+  std::cout << "Sending tool pose: " << stringStream.str() << std::endl;
+  std_msgs::String msg;
+  msg.data = stringStream.str();
+  ros::NodeHandle n;
+  ros::Publisher tool_pose_pub = n.advertise<std_msgs::String>("tool_pose", 1000);
+  std::cout << "Waiting for subscribers" << std::endl;
+  while (tool_pose_pub.getNumSubscribers() <= 0)
+    sleep(1);
+  tool_pose_pub.publish(msg);
+  ros::spinOnce();
+  std::cout << "Tool pose sent" << std::endl;
+}
+
 melfa::JointState requestJointState() {
   std::string device_name("/dev/ttyUSB0");
   melfa::Melfa::ConfigParams params;
@@ -637,7 +724,7 @@ melfa::JointState requestJointState() {
     melfa.connect();
     std::cout << "Robot connected." << std::endl;
     std::cout << "Requesting joint state: " << std::endl;
-    melfa::JointState jointState = melfa.getJointState();
+    jointState = melfa.getJointState();
     std::cout << "Joint state requested." << std::endl;
   } catch (melfa::SerialConnectionError& err) {
     std::cerr << "Serial Connection error: " << err.what() << std::endl;
@@ -650,6 +737,7 @@ melfa::JointState requestJointState() {
 void publishJointState(melfa::JointState jointState) {
   std::cout << "Starting publish joint state" << std::endl;
   std::ostringstream stringStream;
+  std::cout << jointState.j1 << std::endl;
   stringStream <<
     jointState.j1 << "," <<
     jointState.j2 << "," <<
@@ -794,6 +882,12 @@ void nextState(std::string msg)
       melfa::JointState jointState = requestJointState();
       std::cout << "Calling publish joint state" << std::endl;
       publishJointState(jointState);
+      return;
+    }
+    if (msg == REQ_TOOL_POSE) {
+      ROS_INFO("REQ_TOOL_POSE");
+      melfa::ToolPose toolPose = requestToolPose();
+      publishToolPose(toolPose);
       return;
     }
     //ERROR

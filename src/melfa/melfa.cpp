@@ -218,6 +218,12 @@ melfa::JointState melfa::Melfa::getJointState()
     joint_state.j4 = atof(joint_msg[7].c_str()) / 180.0 * M_PI;
     joint_state.j5 = atof(joint_msg[9].c_str()) / 180.0 * M_PI;
     joint_state.j6 = atof(joint_msg[11].c_str()) / 180.0 * M_PI;
+    std::cout << joint_state.j1 << std::endl;
+    for (int i = 0; i < joint_msg.size(); i++) {
+      if (i % 2 == 1) {
+        std::cout << M_PI * atof(joint_msg[i].c_str()) << std::endl;
+      }
+    }
     return joint_state;
 }
 
