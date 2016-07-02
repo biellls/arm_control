@@ -25,6 +25,7 @@
 #define CTL_POINTS_END "---LOAD POINTS END---"
 #define CTL_RUN_PROGRAM "---RUN PROGRAM---"
 #define CTL_DELETE "---DELETE---"
+#define CTL_MOVE_JOINT_STATE "---MOVE JOINT STATE---"
 
 // Movement commands
 #define MOV_TOOL_X_POS "---MOV TOOL +X---"
@@ -59,6 +60,7 @@ enum States
     S3, // Load points state: wait for points and write them to file
         // * Transition: point -> S3
         //               CTL_POINTS_END -> S8
+    S4
     //(S4), Execute instruction and transition to S0
         // * Transition: _ -> S0
     //(S5), Load program and transition to S0
@@ -82,6 +84,7 @@ Connection_states connection_state;
 
 // Constants
 #define MAX_COMMAND_CHARS 256
+#define TOOL_INCREMENT 0.05
 
 std::fstream program_file, points_file;
 
@@ -92,7 +95,9 @@ std::string stateName(States s)
   if (s == S0) return "S0";
   else if (s == S1) return "S1";
   else if (s == S2) return "S2";
-  else return "S3";
+  else if (s == S3) return "S3";
+  else if (s == S4) return "S4";
+  else return "Unknown State";
 }
 
 void send_command(std::string command)
@@ -329,22 +334,22 @@ void loadProgram() {
   melfa::Melfa::ConfigParams params;
   params.device = std::string(device_name);
 
-  /////////////////////////////////////////////////////melfa::Melfa melfa(params);
+  melfa::Melfa melfa(params);
   try
     {
-      /////////////////////////////////////////////////////melfa.connectForLoad();
+      melfa.connectForLoad();
       std::cout << "Robot connected." << std::endl;
 
       //Prepare load
-      /////////////////////////////////////////////////////melfa.sendCommand("1;1;NEW");
-      /////////////////////////////////////////////////////melfa.sendCommand("1;1;LOAD=1");
-      /////////////////////////////////////////////////////melfa.sendCommand("1;1;PRTVERLISTL");
-      /////////////////////////////////////////////////////melfa.sendCommand("1;1;PRTVEREMDAT");
+      melfa.sendCommand("1;1;NEW");
+      melfa.sendCommand("1;1;LOAD=1");
+      melfa.sendCommand("1;1;PRTVERLISTL");
+      melfa.sendCommand("1;1;PRTVEREMDAT");
       std::cout << "Load prepared." << std::endl;
 
       std::cout << "Sending command: 1;9;LISTL<" << std::endl;
-      //std::vector<std::string> response = melfa.sendCommand("1;9;LISTL<");
-      /////////////////////////////////////////////////////printResponse(melfa.sendCommand("1;9;LISTL<"));
+      std::vector<std::string> response = melfa.sendCommand("1;9;LISTL<");
+      printResponse(melfa.sendCommand("1;9;LISTL<"));
 
       //Get program lines and numbers
       if (program_file.is_open())
@@ -376,7 +381,7 @@ void loadProgram() {
           std::cout << "Sending command for line nums (command size = " << commandLineNums.size() << "): "
                     << commandLineNums << std::endl;
           std::cout << "Begin i = " << begin_i << " and i = " << i + 1 << std::endl;
-          /////////////////////////////////////////////////////melfa.sendCommand(commandLineNums);
+          melfa.sendCommand(commandLineNums);
           std::vector<std::string> sub2(&lines[begin_i], &lines[i + 1]);
           commandLines = commandLines + join(sub2, "\v");
           commandsUploadLines.push_back(commandLines);
@@ -386,7 +391,7 @@ void loadProgram() {
           std::cout << "Sending command for line nums (command size = " << commandLineNums.size() << "): "
                     << commandLineNums << std::endl;
           std::cout << "Begin i = " << begin_i << " and i = " << i << std::endl;
-          /////////////////////////////////////////////////////melfa.sendCommand(commandLineNums);
+          melfa.sendCommand(commandLineNums);
           std::vector<std::string> sub2(&lines[begin_i], &lines[i]);
           commandLines = commandLines + join(sub2, "\v");
           commandsUploadLines.push_back(commandLines);
@@ -406,79 +411,10 @@ void loadProgram() {
       for (int i = 0; i < commandsUploadLines.size(); i ++) {
         std::cout << "Sending command for line (command size = " << commandsUploadLines[i].size() << "): "
                   << commandsUploadLines[i] << std::endl;
-        /////////////////////////////////////////////////////melfa.sendCommand(commandsUploadLines[i]);
+        melfa.sendCommand(commandsUploadLines[i]);
       }
-
-      //std::cout << "Sending program lines" << std::endl;
-      //std::string command = "1;9;EMDAT" + join(v, "\v");
-      //if (command.length() < MAX_COMMAND_CHARS) {
-      //  std::cout << "Short program" << std::endl;
-      //  std::cout << "Sending command: " << command << std::endl;
-      //  melfa.sendCommand(command);
-      //} else {    //If the command is too long break it down
-      //  std::cout << "Long program. Break into chunks and send over several instructions" << std::endl;
-      //  std::size_t start = 0;
-      //  std::size_t i = command.find("\v");
-      //  std::cout << "Stopping at " << MAX_COMMAND_CHARS << ". First \v found at " << i << std::endl;
-      //  while(i != std::string::npos) {
-      //    std::size_t ni = command.find("\v", i+1);
-      //    std::cout << "\v found at " << i << std::endl;
-      //    std::cout << "Stopping at " << (start + MAX_COMMAND_CHARS -1) << std::endl;
-      //    if (ni > (start + MAX_COMMAND_CHARS - 1)) {
-      //      //send command substring
-      //      std::string cs = command.substr(start, i - start + 1);
-      //      std::cout << "Sending command: " << cs << std::endl;
-      //      melfa.sendCommand(cs);
-      //      start = i;
-      //    }
-      //    i = ni;
-      //  }
-      //}
-      //melfa.sendCommand("1;9;EMDAT10\v20\v30\v40");
-      //melfa.sendCommand("1;9;EMDAT10 OVRD 30\v20 MOV P1\v30 MOV P5\v40 END");
-
-      //std::cout << "Program lines sent." << std::endl;
-
-      ////Send program
-      //if (program_file.is_open())
-      //  program_file.close();
-      //program_file.open(PROGRAM_FILE);
-
-      //std::vector<std::string> v2;
-      //while (std::getline(program_file, line)) {
-      //  //Strip \n
-      //  line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
-      //  v2.push_back(line);
-      //}
-      //command = "1;9;EMDAT" + join(v2, "\v");
-      //std::cout << "Sending program" << std::endl;
-      //if (command.length() < MAX_COMMAND_CHARS) {
-      //  std::cout << "Short program" << std::endl;
-      //  std::cout << "Sending command: " << command << std::endl;
-      //  melfa.sendCommand(command);
-      //} else {    //If the command is too long break it down
-      //  std::cout << "Long program. Break into chunks and send over several instructions" << std::endl;
-      //  std::size_t start = 0;
-      //  std::size_t i = command.find("\v");
-      //  while(i != std::string::npos) {
-      //    std::size_t ni = command.find("\v", i+1);
-      //    if (ni > start + MAX_COMMAND_CHARS - 1) {
-      //      //send command substring
-      //      std::string cs = command.substr(start, i - start + 1);
-      //      std::cout << "Sending command: " << cs << std::endl;
-      //      melfa.sendCommand(cs);
-      //      start = i;
-      //    }
-      //    i = ni;
-      //  }
-      //}
-      //std::cout << "Program sent." << std::endl;
-
       //Save file
-      /////////////////////////////////////////////////////melfa.sendCommand("1;1;SAVE");
-      //std::cout << "Executing command: " << command << std::endl;
-      //melfa.sendCommand(command);
-      //std::cout << "Execution finished." << std::endl;
+      melfa.sendCommand("1;1;SAVE");
     }
   catch (melfa::SerialConnectionError& err)
     {
@@ -488,16 +424,10 @@ void loadProgram() {
     {
       std::cerr << "Robot error: " << err.what() << std::endl;
     }
-
 }
 
 void loadPoints() {
   std::cout << "Load points started" << std::endl;
-  //Init sequence TODO mirar si hay que sacarlo fuera para sustituir a initrobot
-  //initSequence();
-  //prepareLoad();
-  //sendPoints();
-  //closeSequence();
   if (DEBUG) return;
 
   std::string device_name("/dev/ttyUSB0");
@@ -524,21 +454,54 @@ void loadPoints() {
       points_file.open(POINTS_FILE);
 
       std::string line;
-      std::vector<std::string> v2;
+      std::vector<std::string> pointLines;
       while (std::getline(points_file, line)) {
+        if (line == "") {
+          std::cout << "Skipping empty line" << std::endl;
+          continue;
+        }
         //Strip \n
-        std::cout << "Line before 1: " << line << std::endl;
         line.erase(std::remove(line.begin(), line.end(), '\n'), line.end());
         //Remove DEF POS from start
         std::cout << "Line before: " << line << std::endl;
         line = line.substr(strlen("DEF POS "));
         std::cout << "Line after: " << line << std::endl;
-        v2.push_back(line);
+        pointLines.push_back(line);
       }
-      std::string command = "1;9;EMDAT" + join(v2, "\v");
-      std::cout << "Sending command: " << command << std::endl;
-      melfa.sendCommand(command);
-      std::cout << "Points sent." << std::endl;
+
+      std::string commandLines = "1;9;EMDAT";
+      int commandLinesLength = commandLines.size();
+      int begin_i = 0;
+      for (int i = 0; i < pointLines.size(); i++) {
+        if (i == pointLines.size() - 1) { //Last line. We should upload it regardless of size
+          std::vector<std::string> sub(&pointLines[begin_i], &pointLines[i + 1]);
+          commandLines = commandLines + join(sub, "\v");
+          std::cout << "Sending last command for points (command size = " << commandLines.size() << "): "
+                    << commandLines << std::endl;
+          std::cout << "Begin i = " << begin_i << " and i = " << i + 1 << std::endl;
+          melfa.sendCommand(commandLines);
+        } else if (commandLinesLength + pointLines[i].size() >= MAX_COMMAND_CHARS) {
+          std::vector<std::string> sub(&pointLines[begin_i], &pointLines[i]);
+          commandLines = commandLines + join(sub, "\v");
+          std::cout << "Sending command for points (command size = " << commandLines.size() << "): "
+                    << commandLines << std::endl;
+          std::cout << "Begin i = " << begin_i << " and i = " << i << std::endl;
+          melfa.sendCommand(commandLines);
+          
+          // Reset values
+          commandLines = "1;9;EMDAT";
+          commandLinesLength = commandLines.size() + pointLines[i].size();
+          begin_i = i;
+        } else {
+          std::cout << "Adding line = '" << pointLines[i] << "' of size = " << pointLines[i].size() << std::endl;
+          commandLinesLength += pointLines[i].size() + 1;   //Add 1 because of vertical tab
+          std::cout << "New size is " << commandLinesLength << std::endl;
+        }
+      }
+      //std::string command = "1;9;EMDAT" + join(v2, "\v");
+      //std::cout << "Sending command: " << command << std::endl;
+      //melfa.sendCommand(command);
+      //std::cout << "Points sent." << std::endl;
 
       //Save file
       melfa.sendCommand("1;1;SAVE");
@@ -734,6 +697,44 @@ melfa::JointState requestJointState() {
   return jointState;
 }
 
+void moveJoints(std::string msg) {
+  std::string device_name("/dev/ttyUSB0");
+  melfa::Melfa::ConfigParams params;
+  params.device = std::string(device_name);
+
+  double j1, j2, j3, j4, j5, j6;
+  if (sscanf(msg.c_str(), "(%lf,%lf,%lf,%lf,%lf,%lf)",
+             &j1, &j2, &j3, &j4, &j5, &j6) < 0) {
+    std::cout << "Error parsing joint message" << msg << std::endl;
+  }
+  melfa::JointState joint_state;
+  joint_state.j1 = j1 / 180.0 * M_PI;
+  joint_state.j2 = j2 / 180.0 * M_PI;
+  joint_state.j3 = j3 / 180.0 * M_PI;
+  joint_state.j4 = j4 / 180.0 * M_PI;
+  joint_state.j5 = j5 / 180.0 * M_PI;
+  joint_state.j6 = j6 / 180.0 * M_PI;
+  
+  melfa::Melfa melfa(params);
+  try {
+    melfa.connect();
+    std::cout << "Robot connected." << std::endl;
+    std::cout << "Moving joints" << std::endl;
+    std::cout << "J1: " << joint_state.j1 << std::endl;
+    std::cout << "J2: " << joint_state.j2 << std::endl;
+    std::cout << "J3: " << joint_state.j3 << std::endl;
+    std::cout << "J4: " << joint_state.j4 << std::endl;
+    std::cout << "J5: " << joint_state.j5 << std::endl;
+    std::cout << "J6: " << joint_state.j6 << std::endl;
+    melfa.moveJoints(joint_state);
+    std::cout << "Joints moved." << std::endl;
+  } catch (melfa::SerialConnectionError& err) {
+    std::cerr << "Serial Connection error: " << err.what() << std::endl;
+  } catch (melfa::RobotError& err) {
+    std::cerr << "Robot error: " << err.what() << std::endl;
+  }
+}
+
 void publishJointState(melfa::JointState jointState) {
   std::cout << "Starting publish joint state" << std::endl;
   std::ostringstream stringStream;
@@ -758,16 +759,61 @@ void publishJointState(melfa::JointState jointState) {
   std::cout << "Joint state sent" << std::endl;
 }
 
-//TODO implement execute commands
+void printToolPose(melfa::ToolPose toolPose) {
+  std::cout << "Tool pose: (" <<
+    toolPose.x << "," <<
+    toolPose.y << "," <<
+    toolPose.z << "," <<
+    toolPose.roll << "," <<
+    toolPose.pitch << "," <<
+    toolPose.yaw << ")" << std::endl;
+}
+
 void executeCommandMessage(std::string msg) {
-  if (msg == MOV_TOOL_X_POS) {
-  } else if (msg == MOV_TOOL_X_NEG) {
-  } else if (msg == MOV_TOOL_Y_POS) {
-  } else if (msg == MOV_TOOL_Y_NEG) {
-  } else if (msg == MOV_TOOL_Z_POS) {
-  } else if (msg == MOV_TOOL_Z_NEG) {
-  } else {
-    std::cerr << "Invalid command message error: " << stateName(state) << " for message " << msg << std::endl;
+  std::string device_name("/dev/ttyUSB0");
+  melfa::Melfa::ConfigParams params;
+  params.device = std::string(device_name);
+  
+  melfa::Melfa melfa(params);
+  try {
+    melfa.connect();
+    std::cout << "Robot connected." << std::endl;
+    std::cout << "Executing command message" << std::endl;
+    //jointState = melfa.getJointState();
+    if (msg == MOV_TOOL_X_POS) {
+      melfa::ToolPose toolPose = melfa.getToolPose();
+      printToolPose(toolPose);
+      toolPose.x += TOOL_INCREMENT;
+      printToolPose(toolPose);
+      melfa.moveTool(toolPose);
+    } else if (msg == MOV_TOOL_X_NEG) {
+      melfa::ToolPose toolPose = melfa.getToolPose();
+      toolPose.x -= TOOL_INCREMENT;
+      melfa.moveTool(toolPose);
+    } else if (msg == MOV_TOOL_Y_POS) {
+      melfa::ToolPose toolPose = melfa.getToolPose();
+      toolPose.y += TOOL_INCREMENT;
+      melfa.moveTool(toolPose);
+    } else if (msg == MOV_TOOL_Y_NEG) {
+      melfa::ToolPose toolPose = melfa.getToolPose();
+      toolPose.y -= TOOL_INCREMENT;
+      melfa.moveTool(toolPose);
+    } else if (msg == MOV_TOOL_Z_POS) {
+      melfa::ToolPose toolPose = melfa.getToolPose();
+      toolPose.z += TOOL_INCREMENT;
+      melfa.moveTool(toolPose);
+    } else if (msg == MOV_TOOL_Z_NEG) {
+      melfa::ToolPose toolPose = melfa.getToolPose();
+      toolPose.z -= TOOL_INCREMENT;
+      melfa.moveTool(toolPose);
+    } else {
+      std::cerr << "Invalid command message error: " << stateName(state) << " for message " << msg << std::endl;
+    }
+    std::cout << "Command message executed" << std::endl;
+  } catch (melfa::SerialConnectionError& err) {
+    std::cerr << "Serial Connection error: " << err.what() << std::endl;
+  } catch (melfa::RobotError& err) {
+    std::cerr << "Robot error: " << err.what() << std::endl;
   }
 }
 
@@ -812,6 +858,10 @@ void handleMessage(std::string msg)
   } else if (state == S3) {
     ROS_INFO("Write point: %s", msg.c_str());
     writeToPointsFile(msg);
+  } else if (state == S4) {
+    ROS_INFO("Move joints: %s", msg.c_str());
+    moveJoints(msg);
+    state = S1;
   } else {
     std::cerr << "Invalid state error: " << stateName(state)
               << " for message " << msg << std::endl;
@@ -829,6 +879,7 @@ bool isControlMessage(std::string msg)
     msg == CTL_POINTS_BEGIN ||
     msg == CTL_POINTS_END ||
     msg == CTL_DELETE ||
+    msg == CTL_MOVE_JOINT_STATE ||
     msg == REQ_JOINT_STATE ||
     msg == REQ_TOOL_POSE;
 }
@@ -869,6 +920,12 @@ void nextState(std::string msg)
         points_file.close();
       points_file.open(POINTS_FILE, std::fstream::out);  //Will overwrite file contents
       state = S3;
+      return;
+    }
+    //We will move to the point specified in the next message
+    if (msg == CTL_MOVE_JOINT_STATE) {
+      ROS_INFO("CTL_MOVE_JOINT_STATE");
+      state = S4;
       return;
     }
     //We delete program and points file from robot and stay on S0
