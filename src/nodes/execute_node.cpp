@@ -1,5 +1,7 @@
 #include "ros/ros.h"
 #include "std_msgs/String.h"
+#include <ctime>
+#include <boost/thread.hpp>
 #include <iostream>
 #include <fstream>
 #include <vector>
@@ -25,7 +27,7 @@
 #define CTL_POINTS_END "---LOAD POINTS END---"
 #define CTL_RUN_PROGRAM "---RUN PROGRAM---"
 #define CTL_DELETE "---DELETE---"
-#define CTL_MOVE_JOINT_STATE "---MOVE JOINT STATE---"
+#define CTL_MOVE_JOINT_STATE "---MOVE TOOL STATE---"
 
 // Movement commands
 #define MOV_TOOL_X_POS "---MOV TOOL +X---"
@@ -84,9 +86,111 @@ Connection_states connection_state;
 
 // Constants
 #define MAX_COMMAND_CHARS 256
-#define TOOL_INCREMENT 0.05
+#define TOOL_INCREMENT 0.02
 
 std::fstream program_file, points_file;
+
+// Global variables for multithreading (remote control)
+#define NULL_COMMAND = "____NULL_COMMAND____"
+bool remote_control_active = false;
+boost::thread remote_control_thread;
+time_t move_x_pos = -1;
+time_t move_x_neg = -1;
+time_t move_y_pos = -1;
+time_t move_y_neg = -1;
+time_t move_z_pos = -1;
+time_t move_z_neg = -1;
+// Time of last finished movement
+time_t last_finished_move = -1;
+
+void printToolPose(melfa::ToolPose toolPose) {
+  std::cout << "Tool pose: (" <<
+    toolPose.x << "," <<
+    toolPose.y << "," <<
+    toolPose.z << "," <<
+    toolPose.roll << "," <<
+    toolPose.pitch << "," <<
+    toolPose.yaw << ")" << std::endl;
+}
+
+void remote_control_task() {
+  std::string device_name("/dev/ttyUSB0");
+  melfa::Melfa::ConfigParams params;
+  params.device = std::string(device_name);
+  
+  melfa::ToolPose toolPose;
+  
+  melfa::Melfa melfa(params);
+  try {
+    melfa.connect();
+    //melfa.initRobot();
+    time_t now = time(0);
+    std::cout << "Starting remote control task " << now << std::endl;
+    melfa.setMaximumVelocity(0.5);
+    melfa.setOverride(20);
+    while (remote_control_active) {
+      if (melfa.isBusy()) {
+        sleep(0.1);
+        continue;
+      }
+      time_t now = time(0);
+      //// GETTING TOOL POSE
+      toolPose = melfa.getToolPose();
+      //// FINISHED GETTING TOOL POSE
+      if (last_finished_move < move_x_pos) {
+        std::cout << "Current timestamp now: " << now
+                  << ", last timestamp X+: " << last_finished_move << std::endl;
+        std::cout << "Remote control move X+" << std::endl;
+        printToolPose(toolPose);
+        toolPose.x += TOOL_INCREMENT;
+      } else if (last_finished_move < move_x_neg) {
+        std::cout << "Current timestamp now: " << now
+                  << ", last timestamp X-: " << last_finished_move << std::endl;
+        std::cout << "Remote control move X-" << std::endl;
+        printToolPose(toolPose);
+        toolPose.x -= TOOL_INCREMENT;
+      } else if (last_finished_move < move_y_pos) {
+        std::cout << "Current timestamp now: " << now
+                  << ", last timestamp Y+: " << last_finished_move << std::endl;
+        std::cout << "Remote control move Y+" << std::endl;
+        printToolPose(toolPose);
+        toolPose.y += TOOL_INCREMENT;
+      } else if (last_finished_move < move_y_neg) {
+        std::cout << "Current timestamp now: " << now 
+                  << ", last timestamp Y-: " << last_finished_move << std::endl;
+        std::cout << "Remote control move Y-" << std::endl;
+        printToolPose(toolPose);
+        toolPose.y -= TOOL_INCREMENT;
+      } else if (last_finished_move < move_z_pos) {
+        std::cout << "Current timestamp now: " << now
+                  << ", last timestamp Z+: " << last_finished_move << std::endl;
+        std::cout << "Remote control move Z+" << std::endl;
+        printToolPose(toolPose);
+        toolPose.z += TOOL_INCREMENT;
+      } else if (last_finished_move < move_z_neg) {
+        std::cout << "Current timestamp now: " << now
+                  << ", last timestamp Z-: " << last_finished_move << std::endl;
+        std::cout << "Remote control move Z-" << std::endl;
+        printToolPose(toolPose);
+        toolPose.z -= TOOL_INCREMENT;
+      } else {
+        //std::cout << "Not moving. Current timestamp now: " << now << std::endl;
+        sleep(0.1);
+        continue;
+      }
+      printToolPose(toolPose);
+      melfa.moveTool(toolPose);
+      last_finished_move = time(0);
+      std::cout << "Finished move" << std::endl;
+      sleep(0.1);
+    }
+  } catch (melfa::SerialConnectionError& err) {
+    std::cerr << "Serial Connection error: " << err.what() << std::endl;
+  } catch (melfa::RobotError& err) {
+    std::cerr << "Robot error: " << err.what() << std::endl;
+  }
+  std::cout << "Exiting remote control task" << std::endl;
+}
 
 // Given a state returns a string representation
 // Useful for printing errors
@@ -572,8 +676,8 @@ void execute_command(std::string command)
   melfa::Melfa melfa(params);
   try
     {
-      //melfa.connect();
-      //std::cout << "Robot connected." << std::endl;
+      melfa.connect();
+      std::cout << "Robot connected." << std::endl;
       std::cout << "Executing command: " << command << std::endl;
       melfa.execute(command);
       std::cout << "Execution finished." << std::endl;
@@ -697,37 +801,42 @@ melfa::JointState requestJointState() {
   return jointState;
 }
 
-void moveJoints(std::string msg) {
+void moveTool(std::string msg) {
   std::string device_name("/dev/ttyUSB0");
   melfa::Melfa::ConfigParams params;
   params.device = std::string(device_name);
 
-  double j1, j2, j3, j4, j5, j6;
+  double x, y, z, roll, pitch, yaw;
   if (sscanf(msg.c_str(), "(%lf,%lf,%lf,%lf,%lf,%lf)",
-             &j1, &j2, &j3, &j4, &j5, &j6) < 0) {
-    std::cout << "Error parsing joint message" << msg << std::endl;
+             &x, &y, &z, &roll, &pitch, &yaw) < 0) {
+    std::cout << "Error parsing tool message" << msg << std::endl;
   }
-  melfa::JointState joint_state;
-  joint_state.j1 = j1 / 180.0 * M_PI;
-  joint_state.j2 = j2 / 180.0 * M_PI;
-  joint_state.j3 = j3 / 180.0 * M_PI;
-  joint_state.j4 = j4 / 180.0 * M_PI;
-  joint_state.j5 = j5 / 180.0 * M_PI;
-  joint_state.j6 = j6 / 180.0 * M_PI;
+  melfa::ToolPose toolPose;
+  toolPose.x = x/1000.0;
+  toolPose.y = y/1000.0;
+  toolPose.z = z/1000.0;
+  toolPose.roll = roll / 180 * M_PI;
+  toolPose.pitch = pitch / 180 * M_PI;
+  toolPose.yaw = yaw / 180 * M_PI;
   
   melfa::Melfa melfa(params);
   try {
     melfa.connect();
+    melfa.setMaximumVelocity(1.0);
+    melfa.setOverride(20);
     std::cout << "Robot connected." << std::endl;
-    std::cout << "Moving joints" << std::endl;
-    std::cout << "J1: " << joint_state.j1 << std::endl;
-    std::cout << "J2: " << joint_state.j2 << std::endl;
-    std::cout << "J3: " << joint_state.j3 << std::endl;
-    std::cout << "J4: " << joint_state.j4 << std::endl;
-    std::cout << "J5: " << joint_state.j5 << std::endl;
-    std::cout << "J6: " << joint_state.j6 << std::endl;
-    melfa.moveJoints(joint_state);
-    std::cout << "Joints moved." << std::endl;
+    std::cout << "Moving Tool" << std::endl;
+    std::cout << "X: " << toolPose.x << std::endl;
+    std::cout << "Y: " << toolPose.y << std::endl;
+    std::cout << "Z: " << toolPose.z << std::endl;
+    std::cout << "Roll: " << toolPose.roll << std::endl;
+    std::cout << "Pitch: " << toolPose.pitch << std::endl;
+    std::cout << "Yaw: " << toolPose.yaw << std::endl;
+    melfa.moveTool(toolPose);
+    while (melfa.isBusy()) {
+      sleep(0.1);
+    }
+    std::cout << "Tool moved." << std::endl;
   } catch (melfa::SerialConnectionError& err) {
     std::cerr << "Serial Connection error: " << err.what() << std::endl;
   } catch (melfa::RobotError& err) {
@@ -759,78 +868,61 @@ void publishJointState(melfa::JointState jointState) {
   std::cout << "Joint state sent" << std::endl;
 }
 
-void printToolPose(melfa::ToolPose toolPose) {
-  std::cout << "Tool pose: (" <<
-    toolPose.x << "," <<
-    toolPose.y << "," <<
-    toolPose.z << "," <<
-    toolPose.roll << "," <<
-    toolPose.pitch << "," <<
-    toolPose.yaw << ")" << std::endl;
+time_t get_command_time(std::string msg) {
+  std::string str_timestamp = msg.substr(17, msg.length());
+  return atoi(str_timestamp.c_str());
+}
+
+bool startsWith(std::string arg, std::string prefix) {
+  return !arg.compare(0, prefix.size(), prefix);
 }
 
 void executeCommandMessage(std::string msg) {
-  std::string device_name("/dev/ttyUSB0");
-  melfa::Melfa::ConfigParams params;
-  params.device = std::string(device_name);
-  
-  melfa::Melfa melfa(params);
-  try {
-    melfa.connect();
-    std::cout << "Robot connected." << std::endl;
-    std::cout << "Executing command message" << std::endl;
-    //jointState = melfa.getJointState();
-    if (msg == MOV_TOOL_X_POS) {
-      melfa::ToolPose toolPose = melfa.getToolPose();
-      printToolPose(toolPose);
-      toolPose.x += TOOL_INCREMENT;
-      printToolPose(toolPose);
-      melfa.moveTool(toolPose);
-    } else if (msg == MOV_TOOL_X_NEG) {
-      melfa::ToolPose toolPose = melfa.getToolPose();
-      toolPose.x -= TOOL_INCREMENT;
-      melfa.moveTool(toolPose);
-    } else if (msg == MOV_TOOL_Y_POS) {
-      melfa::ToolPose toolPose = melfa.getToolPose();
-      toolPose.y += TOOL_INCREMENT;
-      melfa.moveTool(toolPose);
-    } else if (msg == MOV_TOOL_Y_NEG) {
-      melfa::ToolPose toolPose = melfa.getToolPose();
-      toolPose.y -= TOOL_INCREMENT;
-      melfa.moveTool(toolPose);
-    } else if (msg == MOV_TOOL_Z_POS) {
-      melfa::ToolPose toolPose = melfa.getToolPose();
-      toolPose.z += TOOL_INCREMENT;
-      melfa.moveTool(toolPose);
-    } else if (msg == MOV_TOOL_Z_NEG) {
-      melfa::ToolPose toolPose = melfa.getToolPose();
-      toolPose.z -= TOOL_INCREMENT;
-      melfa.moveTool(toolPose);
-    } else {
-      std::cerr << "Invalid command message error: " << stateName(state) << " for message " << msg << std::endl;
-    }
-    std::cout << "Command message executed" << std::endl;
-  } catch (melfa::SerialConnectionError& err) {
-    std::cerr << "Serial Connection error: " << err.what() << std::endl;
-  } catch (melfa::RobotError& err) {
-    std::cerr << "Robot error: " << err.what() << std::endl;
+  if (!remote_control_active) {
+    std::cout << "Activating remote control" << std::endl;
+    remote_control_active = true;
+    remote_control_thread = boost::thread(remote_control_task);
+  }
+  time_t command_time = get_command_time(msg);
+  std::cout << "Remote control active. Command time: " << command_time << std::endl;
+  if (startsWith(msg, MOV_TOOL_X_POS)) {
+    std::cout << "MOV_TOOL_X_POS " << command_time << std::endl;
+    move_x_pos = command_time;
+  } else if (startsWith(msg, MOV_TOOL_X_NEG)) {
+    std::cout << "MOV_TOOL_X_NEG " << command_time << std::endl;
+    move_x_neg = command_time;
+  } else if (startsWith(msg, MOV_TOOL_Y_POS)) {
+    std::cout << "MOV_TOOL_Y_POS " << command_time << std::endl;
+    move_y_pos = command_time;
+  } else if (startsWith(msg, MOV_TOOL_Y_NEG)) {
+    std::cout << "MOV_TOOL_Y_NEG " << command_time << std::endl;
+    move_y_neg = command_time;
+  } else if (startsWith(msg, MOV_TOOL_Z_POS)) {
+    std::cout << "MOV_TOOL_Z_POS " << command_time << std::endl;
+    move_z_pos = command_time;
+  } else if (startsWith(msg, MOV_TOOL_Z_NEG)) {
+    std::cout << "MOV_TOOL_Z_NEG " << command_time << std::endl;
+    move_z_neg = command_time;
+  } else {
+    std::cerr << "Invalid command message error: " << stateName(state) << " for message " << msg << std::endl;
   }
 }
 
 bool isCommandMessage(std::string msg)
 {
   return
-    msg == MOV_TOOL_X_POS ||
-    msg == MOV_TOOL_X_NEG ||
-    msg == MOV_TOOL_Y_POS ||
-    msg == MOV_TOOL_Y_NEG ||
-    msg == MOV_TOOL_Z_POS ||
-    msg == MOV_TOOL_Z_NEG;
+    startsWith(msg, MOV_TOOL_X_POS) ||
+    startsWith(msg, MOV_TOOL_X_NEG) ||
+    startsWith(msg, MOV_TOOL_Y_POS) ||
+    startsWith(msg, MOV_TOOL_Y_NEG) ||
+    startsWith(msg, MOV_TOOL_Z_POS) ||
+    startsWith(msg, MOV_TOOL_Z_NEG);
 }
 
 void handleMessage(std::string msg)
 {
   if (isCommandMessage(msg)) {
+    std::cout << "Executing command message: " << msg << std::endl;
     executeCommandMessage(msg);
     return;
   }
@@ -859,9 +951,9 @@ void handleMessage(std::string msg)
     ROS_INFO("Write point: %s", msg.c_str());
     writeToPointsFile(msg);
   } else if (state == S4) {
-    ROS_INFO("Move joints: %s", msg.c_str());
-    moveJoints(msg);
-    state = S1;
+    ROS_INFO("Move tool: %s", msg.c_str());
+    moveTool(msg);
+    state = S0;
   } else {
     std::cerr << "Invalid state error: " << stateName(state)
               << " for message " << msg << std::endl;
@@ -887,6 +979,12 @@ bool isControlMessage(std::string msg)
 void nextState(std::string msg)
 {
   ROS_INFO("Heard control message: %s", msg.c_str());
+  if (!isCommandMessage(msg) && remote_control_active) {
+    std::cout << "Deactivating remote control" << std::endl;
+    remote_control_active = false;
+    remote_control_thread.join();
+    std::cout << "Joined remote control thread" << std::endl;
+  }
   if (state == S0) {
     //We will execute the next instruction
     if (msg == CTL_EXECUTE) {

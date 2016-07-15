@@ -293,6 +293,7 @@ void melfa::Melfa::setOverride(int value)
     assert(value > 0 && value <= 100);
     std::ostringstream command;
     command << "OVRD " << value;
+    std::cout << "Setting override to " << command.str() << std::endl;
     execute(command.str());
 }
 
